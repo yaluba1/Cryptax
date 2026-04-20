@@ -1,0 +1,153 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: crypto-tax-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: cryptotax
+      MARIADB_USER: cryptotax
+      MARIADB_PASSWORD: cryptotaxpass
+      TZ: Europe/Madrid
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./crytotax-data/mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$MARIADB_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: crypto-tax-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./crytotax-data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: crypto-tax-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadminpass
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./crytotax-data/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: crypto-tax-worker
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      TZ: Europe/Madrid
+
+      APP_ENV: local
+
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: cryptotax
+      DB_USER: cryptotax
+      DB_PASSWORD: cryptotaxpass
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadminpass
+      S3_BUCKET: cryptotax
+      S3_REGION: us-east-1
+      S3_SECURE: "false"
+
+      DATA_DIR: /data
+    volumes:
+      - ./worker:/app
+      - ./crytotax-data/worker:/data
+    command: ["python", "-m", "app.worker"]
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: crypto-tax-api
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      TZ: Europe/Madrid
+
+      APP_ENV: local
+
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: cryptotax
+      DB_USER: cryptotax
+      DB_PASSWORD: cryptotaxpass
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadminpass
+      S3_BUCKET: cryptotax
+      S3_REGION: us-east-1
+      S3_SECURE: "false"
+
+      DATA_DIR: /data
+    volumes:
+      - ./worker:/app
+      - ./crytotax-data/worker:/data
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "8000:8000"
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge

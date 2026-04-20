@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+pymysql
+redis
+rq
+python-multipart
+pydantic
+pydantic-settings
+rp2
+dali-rp2
