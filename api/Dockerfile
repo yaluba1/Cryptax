@@ -9,13 +9,15 @@ WORKDIR ${APP_HOME}
 
 RUN useradd -ms /bin/bash appuser
 
+
 COPY api/requirements.txt /tmp/requirements.txt
 
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install -r /tmp/requirements.txt
 
-RUN mkdir -p /data/input /data/output /data/tmp && \
-    chown -R appuser:appuser ${APP_HOME} /data
+RUN mkdir -p /data/input /data/output /data/tmp /app/logs && \
+    chown -R appuser:appuser ${APP_HOME} /data && \
+    chown -R appuser:appuser /app/logs
 
 COPY api/* ${APP_HOME}
 RUN chown -R appuser:appuser ${APP_HOME}
