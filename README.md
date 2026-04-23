@@ -1,4 +1,4 @@
-# CryptoTax
+# CrypTax
 Free SaaS Solution to calculate taxes for crypto accounts.
 
 ## SaaS version

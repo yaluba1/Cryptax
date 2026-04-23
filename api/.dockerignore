@@ -1,0 +1,11 @@
+.env
+.venv
+schemas/
+__pycache__/
+*.pyc
+.DS_Store
+api/tmp
+test/
+Dockerfile
+.gitignore
+.git/
