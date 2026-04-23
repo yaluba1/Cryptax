@@ -7,18 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR ${APP_HOME}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    curl \
-    ca-certificates \
-    default-libmysqlclient-dev \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN useradd -ms /bin/bash appuser
 
-COPY worker/requirements.txt /tmp/requirements.txt
+COPY api/requirements.txt /tmp/requirements.txt
 
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install -r /tmp/requirements.txt
@@ -26,7 +17,7 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
 RUN mkdir -p /data/input /data/output /data/tmp && \
     chown -R appuser:appuser ${APP_HOME} /data
 
-COPY . ${APP_HOME}
+COPY api/* ${APP_HOME}
 RUN chown -R appuser:appuser ${APP_HOME}
 
 USER appuser

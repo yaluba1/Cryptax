@@ -1,26 +1,29 @@
 services:
-  mariadb:
-    image: mariadb:11.4
-    container_name: crypto-tax-mariadb
-    restart: unless-stopped
-    environment:
-      MARIADB_ROOT_PASSWORD: rootpass
-      MARIADB_DATABASE: cryptotax
-      MARIADB_USER: cryptotax
-      MARIADB_PASSWORD: cryptotaxpass
-      TZ: Europe/Madrid
-    ports:
-      - "3306:3306"
-    volumes:
-      - ./crytotax-data/mariadb:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$MARIADB_ROOT_PASSWORD --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    networks:
-      - backend
+  # mariadb:
+  #   image: mariadb:11.4
+  #   container_name: crypto-tax-mariadb
+  #   restart: unless-stopped
+  #   environment:
+  #     MARIADB_DATABASE: cryptax
+  #     MARIADB_USER: yalcryptax
+  #     MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
+  #     MARIADB_PASSWORD_FILE: /run/secrets/mariadb_usr_password
+  #     TZ: Europe/Madrid
+  #   ports:
+  #     - "3306:3306"
+  #   volumes:
+  #     - ./docker-data/mariadb:/var/lib/mysql
+  #   secrets:
+  #     - mariadb_root_password
+  #     - mariadb_app_password
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$(cat /run/secrets/mariadb_root_password) --silent"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 20s
+  #   networks:
+  #     - backend
 
   redis:
     image: redis:7-alpine
@@ -38,27 +41,30 @@ services:
     networks:
       - backend
 
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: crypto-tax-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadminpass
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - ./crytotax-data/minio:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    networks:
-      - backend
+  # minio:
+  #   image: quay.io/minio/minio:latest
+  #   container_name: crypto-tax-minio
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER_FILE: /run/secrets/minio_root_user
+  #     MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   volumes:
+  #     - ./crytotax-data/minio:/data
+  #   secrets:
+  #     - minio_root_user
+  #     - minio_root_password
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 20s
+  #   networks:
+  #     - backend
 
   worker:
     build:
@@ -67,38 +73,50 @@ services:
     container_name: crypto-tax-worker
     restart: unless-stopped
     depends_on:
-      mariadb:
-        condition: service_healthy
+      # mariadb:
+      #   condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      # minio:
+      #   condition: service_healthy
     environment:
       TZ: Europe/Madrid
 
       APP_ENV: local
 
-      DB_HOST: mariadb
+      # DB_HOST: mariadb
+      DB_HOST: 192.168.77.109
       DB_PORT: 3306
-      DB_NAME: cryptotax
-      DB_USER: cryptotax
-      DB_PASSWORD: cryptotaxpass
+      DB_NAME: cryptax
+      DB_USER: yalcryptax
+      DB_PASSWORD: /run/secrets/mariadb_usr_password   # This will be read by pydantic config, so it does not need the _FILE
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
 
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadminpass
-      S3_BUCKET: cryptotax
-      S3_REGION: us-east-1
-      S3_SECURE: "false"
+      # S3_ENDPOINT: http://minio:9000
+      # S3_ACCESS_KEY_FILE: /run/secrets/minio_root_user
+      # S3_SECRET_KEY_FILE: /run/secrets/minio_root_password
+      # S3_BUCKET: cryptotax
+      # S3_REGION: eu-south-2
+      # S3_SECURE: "false"
+
+      # APP_SECRET_KEY_FILE: /run/secrets/app_secret_key
+      # JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      # DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
 
       DATA_DIR: /data
     volumes:
       - ./worker:/app
       - ./crytotax-data/worker:/data
+    secrets:
+      - mariadb_app_password
+      # - minio_root_user
+      # - minio_root_password
+      # - app_secret_key
+      # - jwt_secret_key
+      # - data_encryption_key
     command: ["python", "-m", "app.worker"]
     networks:
       - backend
@@ -106,7 +124,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: ./worker/Dockerfile
+      dockerfile: ./api/Dockerfile
     container_name: crypto-tax-api
     restart: unless-stopped
     depends_on:
@@ -114,8 +132,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      # minio:
+      #   condition: service_healthy
     environment:
       TZ: Europe/Madrid
 
@@ -123,30 +141,57 @@ services:
 
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: cryptotax
-      DB_USER: cryptotax
-      DB_PASSWORD: cryptotaxpass
+      DB_NAME: cryptax
+      DB_USER: yalcryptax
+      DB_PASSWORD: /run/secrets/mariadb_usr_password    # This will be read by pydantic config, so it does not need the _FILE
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
 
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadminpass
-      S3_BUCKET: cryptotax
-      S3_REGION: us-east-1
-      S3_SECURE: "false"
+      # S3_ENDPOINT: http://minio:9000
+      # S3_ACCESS_KEY_FILE: /run/secrets/api_key
+      # S3_SECRET_KEY_FILE: /run/secrets/api_secret
+      # S3_BUCKET: cryptotax
+      # S3_REGION: eu-south-2
+      # S3_SECURE: "false"
+
+      # APP_SECRET_KEY_FILE: /run/secrets/app_secret_key
+      # JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      # DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
 
       DATA_DIR: /data
     volumes:
       - ./worker:/app
       - ./crytotax-data/worker:/data
+    secrets:
+      - mariadb_app_password
+      # - minio_root_user
+      # - minio_root_password
+      # - app_secret_key
+      # - jwt_secret_key
+      # - data_encryption_key
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "8000:8000"
     networks:
       - backend
+
+secrets:
+  mariadb_usr_password:
+    file: ./secrets/mariadb_usr_password.txt
+  # mariadb_root_password:
+  #   file: ./secrets/mariadb_db_root_password.txt
+  # minio_root_user:
+  #   file: ./secrets/minio_root_user.txt
+  # minio_root_password:
+  #   file: ./secrets/minio_root_password.txt
+  # app_secret_key:
+  #   file: ./secrets/app_secret_key.txt
+  # jwt_secret_key:
+  #   file: ./secrets/jwt_secret_key.txt
+  # data_encryption_key:
+  #   file: ./secrets/data_encryption_key.txt
 
 networks:
   backend:

@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pymysql
+redis
+rq
+python-multipart
+pydantic
+pydantic-settings
