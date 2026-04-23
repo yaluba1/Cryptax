@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN useradd -ms /bin/bash appuser
 
-COPY requirements.txt /tmp/requirements.txt
+COPY worker/requirements.txt /tmp/requirements.txt
 
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install -r /tmp/requirements.txt
