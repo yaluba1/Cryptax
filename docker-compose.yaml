@@ -161,9 +161,9 @@ services:
       # JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
       # DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
 
+      PYTHONPATH: /app
       #  DATA_DIR: /data
     volumes:
-      - ./worker:/app
       - ./cryptax-data/api:/data
       - ./cryptax-data/api/logs:/app/logs
     secrets:
@@ -173,7 +173,7 @@ services:
       # - app_secret_key
       # - jwt_secret_key
       # - data_encryption_key
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
     networks:
