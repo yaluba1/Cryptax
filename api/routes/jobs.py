@@ -13,12 +13,8 @@ router = APIRouter()
 @router.post("/jobs", response_model=JobResponseBody)
 def create_job(job_request: JobRequestBody, db: Session = Depends(get_db)):
     """Create a new tax processing job."""
-    try:
-        job_id = job_service.create_job(db, job_request)
-        return JobResponseBody(job_id=job_id)
-    except Exception as e:
-        logger.exception("Failed to create job")
-        raise HTTPException(status_code=500, detail=str(e))
+    job_id = job_service.create_job(db, job_request)
+    return JobResponseBody(job_id=job_id)
 
 @router.get("/jobs", response_model=List[JobListItem])
 def list_jobs(acc: str = Query(..., description="Account holder email"), db: Session = Depends(get_db)):

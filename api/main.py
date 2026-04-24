@@ -25,9 +25,29 @@ app = FastAPI(
     }
 )
 
+from sqlalchemy.exc import OperationalError, InternalError
+from redis.exceptions import ConnectionError as RedisConnectionError
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler to return HTTP 503 for all unhandled exceptions."""
+    
+    # Handle Database connection / authentication errors more concisely
+    if isinstance(exc, (OperationalError, InternalError)):
+        logger.error(f"Database connection error: {str(exc.orig) if hasattr(exc, 'orig') else str(exc)}")
+        return JSONResponse(
+            status_code=503,
+            content={"message": "Service Unavailable. Database connection failed. Please try again later."},
+        )
+    
+    # Handle Redis connection errors more concisely
+    if isinstance(exc, RedisConnectionError):
+        logger.error(f"Redis connection error: {str(exc)}")
+        return JSONResponse(
+            status_code=503,
+            content={"message": "Service Unavailable. Redis connection failed. Please try again later."},
+        )
+
     logger.error(f"Unhandled exception occurred: {str(exc)}")
     logger.exception(exc)
     return JSONResponse(

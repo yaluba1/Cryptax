@@ -25,15 +25,7 @@ class JobService:
         )
         
         # 2. Queue in RQ
-        try:
-            rq_service.enqueue_job(internal_job)
-        except Exception as e:
-            logger.error(f"Failed to enqueue job {job_id}: {str(e)}")
-            # We continue to store in DB but with error? 
-            # Or should we fail the request?
-            # Requirements say "respond to the request with the jobid", 
-            # but also "error_message... with the error message if there was an error or an exception processing this request".
-            # I'll store it and return the ID.
+        rq_service.enqueue_job(internal_job)
         
         # 3. Store in jobs table
         new_job = Job(

@@ -35,4 +35,12 @@ class RQService:
             logger.error(f"Failed to enqueue job {internal_job.job_id}: {str(e)}")
             raise
 
+    def ping(self) -> bool:
+        """Check if Redis is reachable."""
+        try:
+            return self.redis_conn.ping()
+        except Exception as e:
+            logger.error(f"Redis ping failed: {str(e)}")
+            return False
+
 rq_service = RQService()
