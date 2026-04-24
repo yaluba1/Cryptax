@@ -143,7 +143,6 @@ services:
       DB_PORT: 3306
       DB_NAME: cryptax
       DB_USER: yalcryptax
-      DB_PASSWORD: /run/secrets/mariadb_usr_password    # This will be read by pydantic config, so it does not need the _FILE
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -167,7 +166,8 @@ services:
       - ./cryptax-data/api:/data
       - ./cryptax-data/api/logs:/app/logs
     secrets:
-      - mariadb_usr_password
+      - source: mariadb_usr_password
+        target: db_password
       # - minio_root_user
       # - minio_root_password
       # - app_secret_key

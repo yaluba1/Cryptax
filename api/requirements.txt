@@ -7,3 +7,4 @@ rq
 python-multipart
 pydantic
 pydantic-settings
+loguru
