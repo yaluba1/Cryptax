@@ -5,6 +5,7 @@ Coordinates DB updates, tool execution (DaLI/RP2), and notifications.
 
 import os
 from pathlib import Path
+from rq import get_current_job
 from worker.db import get_db_session
 from worker.services.job_service import job_service
 from worker.services.dali_service import dali_service
@@ -17,6 +18,14 @@ def process_job(job_payload: dict):
     Main entry point for a queued job.
     Expects payload: {'job_id': str, 'api_key': str, 'api_secret': str}
     """
+    # Safety: Increase job timeout to 1 hour if running in an RQ worker
+    job_obj = get_current_job()
+    if job_obj:
+        logger.debug("Increasing current RQ job timeout to 3600s")
+        job_obj.timeout = 3600
+        # On some RQ versions, we might need to save or it might not work at runtime,
+        # but it doesn't hurt.
+    
     job_id = job_payload.get("job_id")
     api_key = job_payload.get("api_key")
     api_secret = job_payload.get("api_secret")
@@ -60,7 +69,7 @@ def process_job(job_payload: dict):
             native_fiat=fiat
         )
         
-        success = dali_service.run_dali(config_path, job_dir)
+        success = dali_service.run_dali(job.country, config_path, job_dir)
         if not success:
             raise RuntimeError("DaLI execution failed.")
             
@@ -72,7 +81,9 @@ def process_job(job_payload: dict):
         success = rp2_service.run_rp2(
             country=job.country,
             input_dir=job_dir,
-            output_dir=job_dir
+            output_dir=job_dir,
+            from_date=f"{job.tax_year}-01-01",
+            to_date=f"{job.tax_year}-12-31"
         )
         if not success:
             raise RuntimeError("RP2 execution failed.")

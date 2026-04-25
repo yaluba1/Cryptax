@@ -4,12 +4,13 @@ Supports country-specific RP2 plugins like rp2_es.
 """
 
 import subprocess
+import shutil
 from pathlib import Path
 from worker.logging_config import logger
 
 class Rp2Service:
     @staticmethod
-    def run_rp2(country: str, input_dir: Path, output_dir: Path, prefix: str = "") -> bool:
+    def run_rp2(country: str, input_dir: Path, output_dir: Path, from_date: str = None, to_date: str = None, prefix: str = "") -> bool:
         """
         Executes the RP2 tool for the specified country.
         Currently only supports 'ES' (Spain).
@@ -20,10 +21,11 @@ class Rp2Service:
         if country.upper() == "ES":
             binary = "rp2_es"
         elif country.upper() == "GENERIC":
-            binary = "rp2"
+            binary = "rp2_generic"
         else:
-            logger.error("Country '{}' not supported yet in RP2 service.", country)
-            return False
+            binary = f"rp2_{country.lower()}"
+            
+        logger.debug("Using RP2 binary: {}", binary)
             
         # Build file paths
         prefix_str = f"{prefix}_" if prefix else ""
@@ -47,6 +49,11 @@ class Rp2Service:
             if prefix:
                 cmd.extend(["-p", prefix])
             
+            if from_date:
+                cmd.extend(["-f", from_date])
+            if to_date:
+                cmd.extend(["-t", to_date])
+            
             cmd.extend([str(ini_file), str(ods_file)])
             
             logger.debug("Executing command: {}", " ".join(cmd))
@@ -64,6 +71,7 @@ class Rp2Service:
                 
             logger.info("RP2 execution completed successfully.")
             logger.debug("RP2 output: {}", result.stdout)
+            Rp2Service._move_logs()
             return True
             
         except FileNotFoundError:
@@ -71,6 +79,27 @@ class Rp2Service:
             return False
         except Exception as e:
             logger.error("An error occurred during RP2 execution: {}", str(e))
+            Rp2Service._move_logs()
             return False
+
+    @staticmethod
+    def _move_logs():
+        """
+        Moves RP2/DaLI log files from the hardcoded ./log directory 
+        to the project's preferred ./logs/rp2 directory.
+        """
+        src_dir = Path("./log")
+        dest_dir = Path("./logs/rp2")
+        
+        if not src_dir.exists():
+            return
+            
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        
+        for log_file in src_dir.glob("rp2_*.log"):
+            try:
+                shutil.move(str(log_file), str(dest_dir / log_file.name))
+            except Exception as e:
+                logger.warning("Failed to move log file {}: {}", log_file, str(e))
 
 rp2_service = Rp2Service()

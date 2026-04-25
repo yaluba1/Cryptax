@@ -28,7 +28,11 @@ class RQService:
         # I'll use a placeholder function 'process_tax_job'.
         
         try:
-            job = self.queue.enqueue("worker.services.job_processor.process_job", job_data)
+            job = self.queue.enqueue(
+                "worker.services.job_processor.process_job", 
+                job_data,
+                job_timeout=3600 # 1 hour timeout
+            )
             logger.info(f"Enqueued job {internal_job.job_id} to RQ. RQ Job ID: {job.id}")
             return job.id
         except Exception as e:

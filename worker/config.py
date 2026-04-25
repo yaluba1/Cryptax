@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     redis_db: int = 0
     rq_queue_name: str = "tax_jobs"
 
+    # Worker Configuration
+    country: str = "ES" # Default country for DaLI/RP2 (e.g., ES, US, GENERIC)
+
     # Logging Configuration
     log_level: str = "INFO"
     log_dir: Path = Path("./logs")

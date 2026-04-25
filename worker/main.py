@@ -6,9 +6,21 @@ Initializes the RQ worker and starts listening for jobs.
 import redis
 import sys
 import os
+import signal
 from rq import Worker, Queue, SimpleWorker
 from worker.config import settings
 from worker.logging_config import logger
+
+def signal_handler(sig, frame):
+    """
+    Handles termination signals to stop the worker gracefully.
+    """
+    logger.info("Termination signal received. Shutting down worker...")
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 def start_worker():
     """
