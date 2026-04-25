@@ -12,37 +12,27 @@ class JobService:
         """Create a new job and enqueue it."""
         job_id = str(uuid.uuid4())
         
-        # 1. Create Internal Job Object
-        internal_job = InternalJob(
-            job_id=job_id,
-            exchange=job_request.exchange,
-            year=job_request.year,
-            account_holder=job_request.account_holder,
-            uid=job_request.uid,
-            api_key=job_request.api_key,
-            api_secret=job_request.api_secret,
-            fiat=job_request.fiat
-        )
-        
-        # 2. Queue in RQ
-        rq_service.enqueue_job(internal_job)
-        
-        # 3. Store in jobs table
+        # 1. Store in jobs table (excluding secrets)
+        payload = job_request.model_dump()
+        payload.pop("api_key", None)
+        payload.pop("api_secret", None)
+
         new_job = Job(
             id=job_id,
+            country=job_request.country.value,
             exchange=job_request.exchange.value,
             tax_year=job_request.year,
             account_holder=job_request.account_holder,
             uid=job_request.uid,
             status=JobStatusEnum.pending.value,
-            request_payload_json=job_request.model_dump(),
+            request_payload_json=payload,
             result_payload_json={},
             error_message="",
             created_at=datetime.now()
         )
         db.add(new_job)
         
-        # 4. Store event in job_events table
+        # 2. Store event in job_events table
         event = JobEvent(
             job_id=job_id,
             event_type="created",
@@ -50,8 +40,24 @@ class JobService:
         )
         db.add(event)
         
+        # 3. Commit to database
         db.commit()
         logger.info(f"Job {job_id} created and stored in database.")
+        
+        # 4. Create Internal Job Object and Queue in RQ
+        # We do this AFTER database commit. If Redis fails, the job is at least in the DB.
+        internal_job = InternalJob(
+            job_id=job_id,
+            api_key=job_request.api_key,
+            api_secret=job_request.api_secret
+        )
+        
+        try:
+            rq_service.enqueue_job(internal_job)
+        except Exception as e:
+            logger.error(f"Failed to enqueue job {job_id} in Redis: {str(e)}")
+            # We don't raise here because the job IS created in DB. 
+            # In a real system, we might want to update the job status to 'error' or 'failed_to_queue'.
         
         return job_id
 
@@ -72,14 +78,18 @@ class JobService:
                     ) for doc in documents
                 ]
             
-            # Extract fiat from request_payload_json
+            # Extract info from request_payload_json
             request_payload = job.request_payload_json
             if isinstance(request_payload, str):
                 request_payload = json.loads(request_payload)
             fiat = request_payload.get("fiat", "USD")
+            generic_data = request_payload.get("generic")
+            generic = GenericInfo(**generic_data) if generic_data else None
             
             result.append(JobListItem(
                 job_id=job.id,
+                country=job.country,
+                generic=generic,
                 exchange=job.exchange,
                 year=job.tax_year,
                 fiat=fiat,

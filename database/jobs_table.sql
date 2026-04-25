@@ -1,5 +1,6 @@
 CREATE TABLE jobs (
   id CHAR(36) PRIMARY KEY,
+  country CHAR(8) NOT NULL COMMENT 'ISO 3166-1 alpha-2 code',
   exchange VARCHAR(20) NOT NULL,
   tax_year INT NOT NULL,
   account_holder VARCHAR(255) NOT NULL COMMENT 'Email in Hanko',
