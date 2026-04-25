@@ -1,5 +1,12 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+"""
+Configuration management for the CrypTax worker service.
+Uses pydantic-settings to load configuration from environment variables,
+.env files, and Docker secrets.
+"""
+
 from pathlib import Path
+from typing import Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Docker secrets directory
 SECRETS_DIR = "/run/secrets"
@@ -26,6 +33,13 @@ class Settings(BaseSettings):
     log_rotation: str = "00:00"
     log_retention: str = "31 days"
     log_compression: str = "zip"
+
+    # Email / SMTP Configuration
+    email_smtp_svr: str = "localhost"
+    email_smtp_port: int = 587
+    email_smtp_cypher: str = "STARTTLS"
+    email_acc_name: str = "info@cryptax.com"
+    email_acc_pws: str = "password"
 
     model_config = SettingsConfigDict(
         env_file=".env",
