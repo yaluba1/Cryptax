@@ -60,16 +60,47 @@ def process_job(job_payload: dict):
         request_payload = job.request_payload_json
         fiat = request_payload.get("fiat", "USD")
         
-        config_path = dali_service.generate_config(
-            job_dir=job_dir,
-            account_holder=job.account_holder,
-            exchange=job.exchange,
-            api_key=api_key,
-            api_secret=api_secret,
-            native_fiat=fiat
-        )
-        
-        success = dali_service.run_dali(job.country, config_path, job_dir)
+        # NEW: Enriched Binance workflow to avoid Kraken hanging problem
+        if job.exchange.lower() in ['binance', 'binance.com']:
+            logger.info("Using enriched Binance workflow for job {}", job_id)
+            
+            # a. Get transactions directly from Binance
+            job_service.add_job_event(db, job_id, "binance_fetch", "Fetching raw transactions from Binance REST API")
+            transactions = dali_service.get_binance_transactions(
+                account_holder=job.account_holder,
+                api_key=api_key,
+                api_secret=api_secret,
+                native_fiat=fiat,
+                country_code=job.country
+            )
+            
+            # b. Enrich with prices via CCXT
+            job_service.add_job_event(db, job_id, "price_enrichment", f"Enriching {len(transactions)} transactions with historical prices from Binance")
+            dali_service.enrich_transactions_with_prices(transactions, fiat)
+            
+            # c. Resolve and Save (generates crypto_data.ini and crypto_data.ods)
+            job_service.add_job_event(db, job_id, "dali_finalizing", "Resolving transactions and generating final output files")
+            success = dali_service.resolve_and_save(job_dir, transactions, fiat, job.exchange, job.account_holder)
+            
+            # d. Check for warnings
+            warnings_path = job_dir / "warnings.txt"
+            if warnings_path.exists():
+                with open(warnings_path, "r", encoding="utf-8") as f:
+                    warn_count = len(f.readlines())
+                job_service.add_job_event(db, job_id, "data_warnings", f"Generated {warn_count} data quality warnings. See warnings.txt for details.")
+            
+        else:
+            # Standard workflow for other exchanges (though currently only binance is supported in API)
+            config_path = dali_service.generate_config(
+                job_dir=job_dir,
+                account_holder=job.account_holder,
+                exchange=job.exchange,
+                api_key=api_key,
+                api_secret=api_secret,
+                native_fiat=fiat
+            )
+            success = dali_service.run_dali(job.country, config_path, job_dir, use_spot_lookup=True)
+
         if not success:
             raise RuntimeError("DaLI execution failed.")
             
@@ -100,7 +131,7 @@ def process_job(job_payload: dict):
         
         files_to_register = [
             ("input_ods", "crypto_data.ods", "application/vnd.oasis.opendocument.spreadsheet"),
-            ("config", "dali.ini", "text/plain")
+            ("warnings", "warnings.txt", "text/plain")
         ]
         
         if job.country.upper() == "ES":

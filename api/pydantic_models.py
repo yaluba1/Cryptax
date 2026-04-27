@@ -15,6 +15,15 @@ class CountryEnum(str, Enum):
     US = "US"
     GENERIC = "GENERIC"
 
+class LangEnum(str, Enum):
+    en = "en"
+    es = "es"
+    de = "de"
+    fr = "fr"
+    it = "it"
+    ja = "ja"
+    pt = "pt"
+
 class AccountingMethodEnum(str, Enum):
     FIFO = "FIFO"
     LIFO = "LIFO"
@@ -32,6 +41,7 @@ class JobStatusEnum(str, Enum):
     error = "error"
 
 class JobRequestBody(BaseModel):
+    lang: LangEnum = Field(LangEnum.en, description="Language used for the job. ISO 639-1.")
     country: CountryEnum = Field(..., description="Countries whose tax regulations apply for this job. ISO 3166-1 alpha-2 code.")
     generic: Optional[GenericInfo] = Field(None, description="Generic information applicable to the user's country of residence. MUST be included if country is GENERIC.")
     exchange: ExchangeEnum
@@ -67,6 +77,7 @@ class DocumentInfo(BaseModel):
 
 class JobListItem(BaseModel):
     job_id: str
+    lang: LangEnum
     country: CountryEnum
     generic: Optional[GenericInfo] = None
     exchange: ExchangeEnum

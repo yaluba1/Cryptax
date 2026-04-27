@@ -11,6 +11,9 @@ from rq import Worker, Queue, SimpleWorker
 from worker.config import settings
 from worker.logging_config import logger
 
+# Set log level for DaLI/RP2
+os.environ["LOG_LEVEL"] = "DEBUG"
+
 def signal_handler(sig, frame):
     """
     Handles termination signals to stop the worker gracefully.

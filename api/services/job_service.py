@@ -19,6 +19,7 @@ class JobService:
 
         new_job = Job(
             id=job_id,
+            lang=job_request.lang.value,
             country=job_request.country.value,
             exchange=job_request.exchange.value,
             tax_year=job_request.year,
@@ -88,6 +89,7 @@ class JobService:
             
             result.append(JobListItem(
                 job_id=job.id,
+                lang=job.lang,
                 country=job.country,
                 generic=generic,
                 exchange=job.exchange,

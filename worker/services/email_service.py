@@ -59,7 +59,7 @@ class EmailService:
                         <ul style="color: #34495e;">
                             <li><b>Tax Report (ODS):</b> The final tax calculation report.</li>
                             <li><b>Input Data (ODS):</b> Normalized transaction data used for the report.</li>
-                            <li><b>Configuration:</b> The settings used for this generation.</li>
+                            <li><b>Data Warnings (TXT):</b> Details on any data quality adjustments made for RP2 compatibility.</li>
                         </ul>
                     </div>
                     <div style="text-align: center; padding: 20px; font-size: 0.9em; color: #95a5a6;">

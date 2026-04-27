@@ -1,7 +1,7 @@
 [project]
 name = "cryptax"
 version = "0.1.0"
-description = "Add your description here"
+description = "Generates tax reports from crypto transactions for different exchanges and valid in various countries."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -10,6 +10,7 @@ dependencies = [
     "fastapi>=0.136.0",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
+    "odfpy>=1.4.1",
     "pydantic>=2.13.3",
     "pydantic-settings>=2.14.0",
     "pymysql>=1.1.2",

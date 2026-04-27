@@ -113,6 +113,7 @@ tmp/
 logs/
 log/
 data/
+tmp_*/
 
 cryptax-data/
 redis-only.yaml
