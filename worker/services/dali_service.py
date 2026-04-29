@@ -100,63 +100,106 @@ class DaliService:
     def enrich_transactions_with_prices(transactions, native_fiat: str):
         """
         Enriches transactions with historical prices from Binance via CCXT.
+        Implements robust retries and bridge currency support for high reliability.
         """
         logger.info("Enriching {} transactions with Binance prices...", len(transactions))
-        exchange = ccxt.binance()
+        # enableRateLimit allows CCXT to manage the request pacing automatically
+        exchange = ccxt.binance({
+            'enableRateLimit': True,
+            'options': {'defaultType': 'spot'}
+        })
         
         # Cache for (asset, fiat, hour_timestamp) -> price
         price_cache = {}
+        native_fiat = native_fiat.upper()
         
+        # Helper for fetching with retries
+        def fetch_ohlcv_safe(symbol, ts):
+            for attempt in range(3):
+                try:
+                    ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', since=ts, limit=1)
+                    return ohlcv
+                except (ccxt.NetworkError, ccxt.RateLimitExceeded) as e:
+                    wait = (attempt + 1) * 2
+                    logger.warning("Transient error fetching {} (attempt {}): {}. Waiting {}s...", symbol, attempt+1, str(e), wait)
+                    time.sleep(wait)
+                except ccxt.BadSymbol:
+                    return None # Non-existent pair, no point in retrying
+                except Exception as e:
+                    logger.error("Unexpected error fetching {}: {}", symbol, str(e))
+                    return None
+            return None
+
         for tx in transactions:
             params = tx.constructor_parameter_dictionary
             current_price = params.get(Keyword.SPOT_PRICE.value)
             
             # Check if spot price is missing or unknown
             if current_price is None or str(current_price).lower() in [Keyword.UNKNOWN.value, 'none', 'nan', '']:
-                symbol = f"{tx.asset}/{native_fiat.upper()}"
+                asset = tx.asset.upper()
                 
                 # Use hourly timestamp as cache key
                 ts_ms = int(tx.timestamp_value.timestamp() * 1000)
                 hour_ts = (ts_ms // 3600000) * 3600000
-                cache_key = (tx.asset, native_fiat.upper(), hour_ts)
+                cache_key = (asset, native_fiat, hour_ts)
                 
                 if cache_key in price_cache:
-                    params[Keyword.SPOT_PRICE.value] = price_cache[cache_key]
+                    DaliService._update_tx_attribute(tx, Keyword.SPOT_PRICE.value, price_cache[cache_key])
                     continue
                 
-                try:
-                    # Try direct symbol first
-                    found_ohlcv = False
-                    logger.debug("Fetching price for {} at {}", symbol, tx.timestamp_value)
-                    
-                    try:
-                        ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', since=hour_ts, limit=1)
-                        if ohlcv:
-                            price = str(ohlcv[0][4])
-                            found_ohlcv = True
-                    except Exception:
-                        # Try inverted symbol (e.g., EUR/USDT instead of USDT/EUR)
-                        inverted_symbol = f"{native_fiat.upper()}/{tx.asset}"
-                        logger.debug("Direct symbol failed, trying inverted: {}", inverted_symbol)
-                        ohlcv = exchange.fetch_ohlcv(inverted_symbol, timeframe='1h', since=hour_ts, limit=1)
-                        if ohlcv:
-                            price = str(1.0 / float(ohlcv[0][4]))
-                            found_ohlcv = True
-                    
-                    if found_ohlcv:
-                        params[Keyword.SPOT_PRICE.value] = price
-                        price_cache[cache_key] = price
-                    else:
-                        logger.warning("No price found on Binance for {} or inverted at {}. Falling back to 0.0000000001", symbol, tx.timestamp_value)
-                        params[Keyword.SPOT_PRICE.value] = "0.0000000001"
-                        # We don't cache the fallback to allow retry if requested, 
-                        # but for this run it will use the small value.
-                except Exception as e:
-                    logger.warning("Failed to fetch price for {} from Binance: {}. Falling back to 0.0000000001", symbol, str(e))
-                    params[Keyword.SPOT_PRICE.value] = "0.0000000001"
+                price = None
                 
-                # Brief sleep to avoid rate limiting if we have many unique timestamps
-                if len(price_cache) % 10 == 0:
+                # --- STRATEGY 1: Direct Pair (e.g. SOL/EUR) ---
+                symbol = f"{asset}/{native_fiat}"
+                ohlcv = fetch_ohlcv_safe(symbol, hour_ts)
+                if ohlcv and len(ohlcv) > 0:
+                    price = str(ohlcv[0][4])
+                    logger.debug("Found direct price for {}: {}", symbol, price)
+                
+                # --- STRATEGY 2: Inverted Pair (e.g. EUR/SOL) ---
+                if price is None:
+                    inv_symbol = f"{native_fiat}/{asset}"
+                    ohlcv = fetch_ohlcv_safe(inv_symbol, hour_ts)
+                    if ohlcv and len(ohlcv) > 0:
+                        price = str(1.0 / float(ohlcv[0][4]))
+                        logger.debug("Found inverted price for {}: {}", inv_symbol, price)
+
+                # --- STRATEGY 3: Bridge via USDT (e.g. SOL/USDT * USDT/EUR) ---
+                if price is None and asset != "USDT":
+                    # a. Asset to USDT
+                    asset_usdt_sym = f"{asset}/USDT"
+                    ohlcv_asset = fetch_ohlcv_safe(asset_usdt_sym, hour_ts)
+                    
+                    # b. USDT to Native Fiat
+                    usdt_fiat_sym = f"USDT/{native_fiat}"
+                    ohlcv_fiat = fetch_ohlcv_safe(usdt_fiat_sym, hour_ts)
+                    
+                    # Try inverted fiat if direct fails (e.g. EUR/USDT)
+                    if not ohlcv_fiat:
+                        fiat_usdt_sym = f"{native_fiat}/USDT"
+                        ohlcv_fiat_inv = fetch_ohlcv_safe(fiat_usdt_sym, hour_ts)
+                        if ohlcv_fiat_inv:
+                            usdt_price_fiat = 1.0 / float(ohlcv_fiat_inv[0][4])
+                        else:
+                            usdt_price_fiat = None
+                    else:
+                        usdt_price_fiat = float(ohlcv_fiat[0][4])
+
+                    if ohlcv_asset and usdt_price_fiat:
+                        asset_price_usdt = float(ohlcv_asset[0][4])
+                        price = str(asset_price_usdt * usdt_price_fiat)
+                        logger.debug("Found bridged price for {} via USDT: {}", asset, price)
+
+                # --- FINALIZE ---
+                if price:
+                    DaliService._update_tx_attribute(tx, Keyword.SPOT_PRICE.value, price)
+                    price_cache[cache_key] = price
+                else:
+                    logger.warning("No price found on Binance for {}/{} at {}. Falling back to 0.0000000001", asset, native_fiat, tx.timestamp_value)
+                    DaliService._update_tx_attribute(tx, Keyword.SPOT_PRICE.value, "0.0000000001")
+                
+                # Small pause to be extra safe with rate limits if we are hammering many new unique hours
+                if len(price_cache) % 20 == 0:
                     time.sleep(0.1)
 
     @staticmethod
@@ -217,6 +260,8 @@ class DaliService:
         
         # 2. Update private attribute (used for property access during INI generation)
         # Handle AbstractTransaction fields (inherited by all)
+        # 2. Update private attribute (used for property access during INI generation)
+        # Handle AbstractTransaction fields (inherited by all)
         if field_name in [Keyword.ASSET.value, Keyword.NOTES.value, Keyword.TIMESTAMP.value, Keyword.UNIQUE_ID.value]:
             attr_name = f"_AbstractTransaction__{field_name}"
         else:
@@ -227,10 +272,14 @@ class DaliService:
             setattr(tx, attr_name, value)
         else:
             # Fallback for unexpected cases or non-standard naming
+            # We must be careful not to call setattr on properties (which have no setter)
             for attr in [f"_{field_name}", field_name]:
                 if hasattr(tx, attr):
-                    setattr(tx, attr, value)
+                    # Check if it's a property to avoid AttributeError: property '...' has no setter
+                    if not isinstance(getattr(tx.__class__, attr, None), property):
+                        setattr(tx, attr, value)
 
+    @staticmethod
     @staticmethod
     def _cleanup_unknown_values(transactions: List[AbstractTransaction], job_dir: Path, default_exchange: str, default_holder: str) -> List[str]:
         """
@@ -305,7 +354,9 @@ class DaliService:
 
             elif isinstance(tx, OutTransaction):
                 try:
-                    if float(tx.crypto_out_no_fee) <= 0 and float(tx.crypto_fee) <= 0:
+                    out_val = float(tx.crypto_out_no_fee)
+                    fee_val = float(tx.crypto_fee)
+                    if out_val <= 0 and fee_val <= 0:
                         DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, tiny_val)
                         tx_modified = True
                 except:
@@ -314,23 +365,40 @@ class DaliService:
 
             elif isinstance(tx, IntraTransaction):
                 try:
-                    sent = float(tx.crypto_sent)
-                    recv = float(tx.crypto_received)
+                    # Robust check for sent/received
+                    sent_str = str(params.get(Keyword.CRYPTO_SENT.value, ""))
+                    recv_str = str(params.get(Keyword.CRYPTO_RECEIVED.value, ""))
+                    
+                    sent = float(sent_str) if sent_str and sent_str.lower() != unknown_val else 0.0
+                    recv = float(recv_str) if recv_str and recv_str.lower() != unknown_val else 0.0
+
                     if sent <= 0:
-                        new_sent = recv if recv > 0 else float(tiny_val)
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_SENT.value, str(new_sent))
+                        sent = recv if recv > 0 else float(tiny_val)
+                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_SENT.value, str(sent))
                         tx_modified = True
-                    if float(tx.crypto_sent) < float(tx.crypto_received):
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, tx.crypto_sent)
+                    
+                    if recv <= 0:
+                        # RP2 usually accepts received=0 if it's a fee-only transfer, 
+                        # but user asked to set it to sent if zero.
+                        recv = sent
+                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, str(recv))
                         tx_modified = True
-                except:
+                        
+                    if sent < recv:
+                        # Cannot receive more than sent (negative fee)
+                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, str(sent))
+                        tx_modified = True
+                except Exception as e:
+                    logger.warning("IntraTransaction numeric repair failed for {}: {}", tx.unique_id, e)
                     DaliService._update_tx_attribute(tx, Keyword.CRYPTO_SENT.value, tiny_val)
+                    DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, tiny_val)
                     tx_modified = True
 
             if tx_modified:
                 current_notes = params.get(Keyword.NOTES.value, "") or ""
-                new_notes = f"{current_notes}; Warning: sanitized for RP2".strip("; ")
-                DaliService._update_tx_attribute(tx, Keyword.NOTES.value, new_notes)
+                if "sanitized" not in str(current_notes).lower():
+                    new_notes = f"{current_notes}; Warning: sanitized for RP2".strip("; ")
+                    DaliService._update_tx_attribute(tx, Keyword.NOTES.value, new_notes)
                 warnings.append(f"Sanitized transaction {tx.unique_id}")
 
         if warnings:
@@ -341,207 +409,6 @@ class DaliService:
                     f.write(f"{w}\n")
             logger.info("Updated {} with {} cleanup warnings.", warnings_path, len(warnings))
             
-        return warnings
-
-        for tx in transactions:
-            params = tx.constructor_parameter_dictionary
-            tx_modified = False
-            
-            # 1. Handle Numeric Fields
-            numeric_fields = {
-                Keyword.SPOT_PRICE.value,
-                Keyword.CRYPTO_IN.value,
-                Keyword.CRYPTO_OUT_NO_FEE.value,
-                Keyword.CRYPTO_OUT_WITH_FEE.value,
-                Keyword.CRYPTO_FEE.value,
-                Keyword.CRYPTO_SENT.value,
-                Keyword.CRYPTO_RECEIVED.value,
-                Keyword.FIAT_IN_NO_FEE.value,
-                Keyword.FIAT_IN_WITH_FEE.value,
-                Keyword.FIAT_FEE.value,
-                Keyword.FIAT_OUT_NO_FEE.value,
-            }
-            
-            for field in numeric_fields:
-                if field in params and str(params[field]).lower() == unknown_val:
-                    fallback = "0"
-                    
-                    # Special case for IntraTransaction crypto_received
-                    # Defaulting to crypto_sent is better for maintaining balance continuity
-                    if field == Keyword.CRYPTO_RECEIVED.value and isinstance(tx, IntraTransaction):
-                        fallback = params.get(Keyword.CRYPTO_SENT.value, "0")
-                        if str(fallback).lower() == unknown_val:
-                            fallback = "0"
-                    
-                    DaliService._update_tx_attribute(tx, field, fallback)
-                    warn_msg = f"Transaction {tx.unique_id} ({tx.timestamp_value}): '{field}' was unknown, defaulted to {fallback}."
-                    warnings.append(warn_msg)
-                    logger.warning(warn_msg)
-                    tx_modified = True
-
-            # 2. Handle String Fields
-            
-            # Exchange
-            if isinstance(tx, (InTransaction, OutTransaction)):
-                if params.get(Keyword.EXCHANGE.value) == unknown_val:
-                    DaliService._update_tx_attribute(tx, Keyword.EXCHANGE.value, default_exchange)
-                    warnings.append(f"Transaction {tx.unique_id}: 'exchange' was unknown, defaulted to {default_exchange}.")
-                    tx_modified = True
-            elif isinstance(tx, IntraTransaction):
-                if params.get(Keyword.FROM_EXCHANGE.value) == unknown_val and params.get(Keyword.TO_EXCHANGE.value) == unknown_val:
-                    DaliService._update_tx_attribute(tx, Keyword.FROM_EXCHANGE.value, "Unknown_Exchange_1")
-                    DaliService._update_tx_attribute(tx, Keyword.TO_EXCHANGE.value, "Unknown_Exchange_2")
-                    warnings.append(f"Transaction {tx.unique_id}: both exchanges were unknown, defaulted to Unknown_Exchange_1/2.")
-                    tx_modified = True
-                else:
-                    if params.get(Keyword.FROM_EXCHANGE.value) == unknown_val:
-                        DaliService._update_tx_attribute(tx, Keyword.FROM_EXCHANGE.value, "Unknown_Exchange_1")
-                        warnings.append(f"Transaction {tx.unique_id}: 'from_exchange' was unknown, defaulted to Unknown_Exchange_1.")
-                        tx_modified = True
-                    if params.get(Keyword.TO_EXCHANGE.value) == unknown_val:
-                        DaliService._update_tx_attribute(tx, Keyword.TO_EXCHANGE.value, "Unknown_Exchange_2")
-                        warnings.append(f"Transaction {tx.unique_id}: 'to_exchange' was unknown, defaulted to Unknown_Exchange_2.")
-                        tx_modified = True
-            
-            # Holder
-            holder_fields = {Keyword.HOLDER.value, Keyword.FROM_HOLDER.value, Keyword.TO_HOLDER.value}
-            for field in holder_fields:
-                if field in params and params.get(field) == unknown_val:
-                    DaliService._update_tx_attribute(tx, field, default_holder)
-                    warnings.append(f"Transaction {tx.unique_id}: '{field}' was unknown, defaulted to {default_holder}.")
-                    tx_modified = True
-
-            # Asset
-            if params.get(Keyword.ASSET.value) == unknown_val:
-                DaliService._update_tx_attribute(tx, Keyword.ASSET.value, "Unknown_asset")
-                warnings.append(f"Transaction {tx.unique_id}: 'asset' was unknown, defaulted to Unknown_asset.")
-                tx_modified = True
-
-            # Transaction Type
-            if params.get(Keyword.TRANSACTION_TYPE.value) == unknown_val:
-                new_type = unknown_val
-                if isinstance(tx, InTransaction):
-                    new_type = Keyword.IN.value
-                elif isinstance(tx, OutTransaction):
-                    new_type = Keyword.OUT.value
-                elif isinstance(tx, IntraTransaction):
-                    new_type = Keyword.INTRA.value
-                
-                if new_type != unknown_val:
-                    DaliService._update_tx_attribute(tx, Keyword.TRANSACTION_TYPE.value, new_type)
-                    warnings.append(f"Transaction {tx.unique_id}: 'transaction_type' was unknown, defaulted based on transaction class.")
-                    tx_modified = True
-                    
-                # Update notes for the ODS file
-                current_notes = params.get(Keyword.NOTES.value, "") or ""
-                new_notes = f"{current_notes}; Warning: some fields were unknown and defaulted".strip("; ")
-                DaliService._update_tx_attribute(tx, Keyword.NOTES.value, new_notes)
-
-            # 3. Handle Zero-Value Constraints (RP2 requires certain fields to be positive)
-            tiny_val = "0.00000001"
-            
-            # Common: Spot Price
-            spot_price_field = Keyword.SPOT_PRICE.value
-            if params.get(spot_price_field):
-                try:
-                    is_zero = float(params[spot_price_field]) == 0
-                except (ValueError, TypeError):
-                    is_zero = False
-                    
-                if is_zero:
-                    # Special case: IntraTransaction with 0 fee allows 0 spot price in RP2
-                    is_zero_fee_intra = False
-                    if isinstance(tx, IntraTransaction):
-                        try:
-                            sent = float(params.get(Keyword.CRYPTO_SENT.value, 0))
-                            received = float(params.get(Keyword.CRYPTO_RECEIVED.value, 0))
-                            if sent == received:
-                                is_zero_fee_intra = True
-                        except (ValueError, TypeError):
-                            pass
-                    
-                    if not is_zero_fee_intra:
-                        DaliService._update_tx_attribute(tx, spot_price_field, tiny_val)
-                        warnings.append(f"Transaction {tx.unique_id}: 'spot_price' was 0, defaulted to {tiny_val}.")
-                        tx_modified = True
-
-            # IntraTransaction Specific
-            if isinstance(tx, IntraTransaction):
-                try:
-                    sent = float(params.get(Keyword.CRYPTO_SENT.value, 0))
-                    received = float(params.get(Keyword.CRYPTO_RECEIVED.value, 0))
-                except (ValueError, TypeError):
-                    sent, received = 0, 0
-                
-                if sent == 0:
-                    if received > 0:
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_SENT.value, str(received))
-                        warnings.append(f"Transaction {tx.unique_id}: 'crypto_sent' was 0, set to 'crypto_received' ({received}).")
-                    else:
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_SENT.value, tiny_val)
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, tiny_val)
-                        warnings.append(f"Transaction {tx.unique_id}: both 'crypto_sent' and 'crypto_received' were 0, set to {tiny_val}.")
-                    tx_modified = True
-                elif received == 0:
-                    # User requested: if crypto_received is zero, then set it to crypto_sent
-                    DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, str(sent))
-                    warnings.append(f"Transaction {tx.unique_id}: 'crypto_received' was 0, set to 'crypto_sent' ({sent}).")
-                    tx_modified = True
-                elif sent < received:
-                    DaliService._update_tx_attribute(tx, Keyword.CRYPTO_SENT.value, str(received))
-                    warnings.append(f"Transaction {tx.unique_id}: 'crypto_sent' < 'crypto_received', set 'crypto_sent' to {received}.")
-                    tx_modified = True
-
-            # InTransaction Specific
-            elif isinstance(tx, InTransaction):
-                # Staking allows 0/negative crypto_in in RP2
-                is_staking = params.get(Keyword.TRANSACTION_TYPE.value, "").lower() == Keyword.STAKING.value.lower()
-                if not is_staking:
-                    try:
-                        is_zero = float(params.get(Keyword.CRYPTO_IN.value, 0)) == 0
-                    except (ValueError, TypeError):
-                        is_zero = False
-                        
-                    if is_zero:
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_IN.value, tiny_val)
-                        warnings.append(f"Transaction {tx.unique_id}: 'crypto_in' was 0, defaulted to {tiny_val}.")
-                        tx_modified = True
-
-            # OutTransaction Specific
-            elif isinstance(tx, OutTransaction):
-                is_fee_tx = params.get(Keyword.TRANSACTION_TYPE.value, "").lower() == Keyword.FEE.value.lower()
-                if is_fee_tx:
-                    try:
-                        is_zero = float(params.get(Keyword.CRYPTO_FEE.value, 0)) == 0
-                    except (ValueError, TypeError):
-                        is_zero = False
-                    if is_zero:
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_FEE.value, tiny_val)
-                        warnings.append(f"Transaction {tx.unique_id}: 'crypto_fee' was 0 for Fee transaction, defaulted to {tiny_val}.")
-                        tx_modified = True
-                else:
-                    try:
-                        is_zero = float(params.get(Keyword.CRYPTO_OUT_NO_FEE.value, 0)) == 0
-                    except (ValueError, TypeError):
-                        is_zero = False
-                    if is_zero:
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, tiny_val)
-                        warnings.append(f"Transaction {tx.unique_id}: 'crypto_out_no_fee' was 0, defaulted to {tiny_val}.")
-                        tx_modified = True
-
-            if tx_modified:
-                # Ensure the notes reflect that the transaction was modified
-                current_notes = params.get(Keyword.NOTES.value, "") or ""
-                if "Warning" not in current_notes:
-                    new_notes = f"{current_notes}; Warning: some fields were modified for RP2 compatibility".strip("; ")
-                    DaliService._update_tx_attribute(tx, Keyword.NOTES.value, new_notes)
-
-        if warnings:
-            warnings_path = job_dir / "warnings.txt"
-            with open(warnings_path, "w", encoding="utf-8") as f:
-                for warning in warnings:
-                    f.write(f"{warning}\n")
-            logger.info("Created {} with {} warnings.", warnings_path, len(warnings))
         return warnings
 
     @staticmethod
@@ -704,17 +571,28 @@ class DaliService:
         Moves RP2/DaLI log files from the hardcoded ./log directory 
         to the project's preferred ./logs/rp2 directory.
         """
+        import time
+        import os
+        
         src_dir = Path("./log")
         dest_dir = Path("./logs/rp2")
         
         if not src_dir.exists():
             return
             
+        # Small delay to ensure file handles are released by the OS
+        time.sleep(0.5)
         dest_dir.mkdir(parents=True, exist_ok=True)
         
         for log_file in src_dir.glob("rp2_*.log"):
             try:
                 shutil.move(str(log_file), str(dest_dir / log_file.name))
+            except PermissionError as e:
+                # Handle WinError 32: File in use
+                if os.name == 'nt' and getattr(e, 'winerror', None) == 32:
+                    logger.debug("Log file {} is currently in use (possibly by another job), skipping move.", log_file)
+                else:
+                    logger.warning("Permission error moving log file {}: {}", log_file, str(e))
             except Exception as e:
                 logger.warning("Failed to move log file {}: {}", log_file, str(e))
 

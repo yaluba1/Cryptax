@@ -88,17 +88,28 @@ class Rp2Service:
         Moves RP2/DaLI log files from the hardcoded ./log directory 
         to the project's preferred ./logs/rp2 directory.
         """
+        import time
+        import os
+        
         src_dir = Path("./log")
         dest_dir = Path("./logs/rp2")
         
         if not src_dir.exists():
             return
             
+        # Small delay to ensure file handles are released by the OS
+        time.sleep(0.5)
         dest_dir.mkdir(parents=True, exist_ok=True)
         
         for log_file in src_dir.glob("rp2_*.log"):
             try:
                 shutil.move(str(log_file), str(dest_dir / log_file.name))
+            except PermissionError as e:
+                # Handle WinError 32: File in use
+                if os.name == 'nt' and getattr(e, 'winerror', None) == 32:
+                    logger.debug("Log file {} is currently in use (possibly by another job), skipping move.", log_file)
+                else:
+                    logger.warning("Permission error moving log file {}: {}", log_file, str(e))
             except Exception as e:
                 logger.warning("Failed to move log file {}: {}", log_file, str(e))
 

@@ -19,6 +19,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(String(36), primary_key=True)
+    lang = Column(String(2), nullable=False)
     country = Column(String(8), nullable=False)  # Supports ISO code and "GENERIC"
     exchange = Column(String(20), nullable=False)
     tax_year = Column(Integer, nullable=False)

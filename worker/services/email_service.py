@@ -19,51 +19,53 @@ class EmailService:
         country: str,
         exchange: str,
         year: int,
-        attachments: list[Path]
+        attachments: list[Path],
+        lang: str = "en"
     ) -> bool:
         """
         Sends an email to the user indicating that the tax job is completed.
         Includes generated reports as attachments.
         """
-        logger.info("Sending job completion email to {}", recipient_email)
+        from worker.services.localization_service import localization_service
+        
+        logger.info("Sending job completion email to {} (lang: {})", recipient_email, lang)
+        
+        strings = localization_service.get_email_strings(lang)
         
         try:
             # Create message container
             msg = MIMEMultipart()
             msg['From'] = settings.email_acc_name
             msg['To'] = recipient_email
-            msg['Subject'] = f"CrypTax: Your Tax Report for {year} is Ready! (Job: {job_id[:8]})"
             
-            # HTML Body with "Premium" aesthetics (clean, modern, with some colors)
+            # Localized Subject
+            subject_tmpl = strings.get("subject", "CrypTax: Your Tax Report for {year} in {exchange} is Ready")
+            msg['Subject'] = subject_tmpl.format(year=year, exchange=exchange.capitalize())
+            
+            # Localized HTML Body
             html_body = f"""
             <html>
                 <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
                     <div style="text-align: center; padding-bottom: 20px;">
                         <h1 style="color: #2c3e50;">CrypTax</h1>
-                        <p style="color: #7f8c8d; font-size: 1.1em;">Your crypto tax reporting partner</p>
                     </div>
                     <hr style="border: 0; border-top: 1px solid #eee;">
                     <div style="padding: 20px 0;">
-                        <h2 style="color: #27ae60;">Tax Report Completed</h2>
-                        <p>Hello,</p>
-                        <p>We are pleased to inform you that your tax report for the year <b>{year}</b> has been generated successfully.</p>
+                        <h2 style="color: #27ae60;">{strings.get('body_title')}</h2>
+                        <p>{strings.get('greeting')}</p>
+                        <p>{strings.get('intro').format(year=year)}</p>
                         
                         <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                            <p style="margin: 5px 0;"><b>Job ID:</b> {job_id}</p>
-                            <p style="margin: 5px 0;"><b>Country:</b> {country}</p>
-                            <p style="margin: 5px 0;"><b>Exchange:</b> {exchange.capitalize()}</p>
-                            <p style="margin: 5px 0;"><b>Tax Year:</b> {year}</p>
+                            <p style="margin: 5px 0;"><b>{strings.get('label_job_id')}:</b> {job_id}</p>
+                            <p style="margin: 5px 0;"><b>{strings.get('label_country')}:</b> {country}</p>
+                            <p style="margin: 5px 0;"><b>{strings.get('label_exchange')}:</b> {exchange.capitalize()}</p>
+                            <p style="margin: 5px 0;"><b>{strings.get('label_tax_year')}:</b> {year}</p>
                         </div>
                         
-                        <p>The generated reports are attached to this email:</p>
-                        <ul style="color: #34495e;">
-                            <li><b>Tax Report (ODS):</b> The final tax calculation report.</li>
-                            <li><b>Input Data (ODS):</b> Normalized transaction data used for the report.</li>
-                            <li><b>Data Warnings (TXT):</b> Details on any data quality adjustments made for RP2 compatibility.</li>
-                        </ul>
+                        <p>{strings.get('attachment_info')}</p>
                     </div>
                     <div style="text-align: center; padding: 20px; font-size: 0.9em; color: #95a5a6;">
-                        <p>&copy; 2026 CrypTax Service. All rights reserved.</p>
+                        <p>{strings.get('footer')}</p>
                     </div>
                 </body>
             </html>

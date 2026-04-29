@@ -121,38 +121,128 @@ def process_job(job_payload: dict):
             
         job_service.add_job_event(db, job_id, "rp2_completed", "RP2 finished successfully")
 
-        # 6. Register documents
+        # 6. Post-processing and Registration
+        import pandas as pd
+        import zipfile
+        import shutil
+        
         attachments = []
         result_metadata = {"documents": []}
         
-        # Files to register
-        # DaLI outputs: crypto_data.ods, crypto_data.ini (actually DaLI generates dali.ini, but dali_main generates a copy in output)
-        # RP2 ES outputs: tax_report_es.ods
+        # Calculate Prefix: [Exchange]_[tax_year]_[email_username]_
+        email_username = job.account_holder.split('@')[0].replace('.', '_')
+        prefix = f"{job.exchange}_{job.tax_year}_{email_username}_"
         
-        files_to_register = [
+        # 1. Identify and Rename ODS files
+        # The user specified these names
+        ods_files_map = {
+            "fifo_open_positions.ods": "ods_open_positions",
+            "fifo_rp2_full_report.ods": "ods_rp2_full_report"
+        }
+        
+        renamed_ods_paths = {} # original_name: new_path
+        
+        for old_name, doc_type in ods_files_map.items():
+            old_path = job_dir / old_name
+            if old_path.exists():
+                new_name = f"{prefix}{old_name}"
+                new_path = job_dir / new_name
+                shutil.move(str(old_path), str(new_path))
+                renamed_ods_paths[old_name] = new_path
+                
+                # Register renamed ODS
+                size = new_path.stat().st_size
+                doc_id = job_service.register_document(
+                    db=db,
+                    job_id=job_id,
+                    doc_type=doc_type,
+                    storage_path=str(new_path),
+                    filename=new_name,
+                    mime_type="application/vnd.oasis.opendocument.spreadsheet",
+                    size=size
+                )
+                result_metadata["documents"].append({"id": doc_id, "type": doc_type, "filename": new_name})
+            else:
+                logger.warning("Expected report file not found: {}", old_path)
+
+        # 2. Convert to XLSX
+        excel_paths = []
+        for old_name, ods_path in renamed_ods_paths.items():
+            xlsx_name = ods_path.name.replace(".ods", ".xlsx")
+            xlsx_path = job_dir / xlsx_name
+            
+            try:
+                logger.info("Converting {} to XLSX...", ods_path.name)
+                # Load ODS and save as XLSX
+                # sheet_name=None loads all sheets as a dictionary
+                df_map = pd.read_excel(str(ods_path), engine="odf", sheet_name=None)
+                with pd.ExcelWriter(str(xlsx_path), engine="openpyxl") as writer:
+                    for sheet_name, df in df_map.items():
+                        df.to_excel(writer, sheet_name=sheet_name, index=False)
+                
+                excel_paths.append(xlsx_path)
+                
+                # Register XLSX
+                doc_type = "xlsx_" + ods_files_map[old_name].split("_", 1)[1]
+                size = xlsx_path.stat().st_size
+                doc_id = job_service.register_document(
+                    db=db,
+                    job_id=job_id,
+                    doc_type=doc_type,
+                    storage_path=str(xlsx_path),
+                    filename=xlsx_name,
+                    mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    size=size
+                )
+                result_metadata["documents"].append({"id": doc_id, "type": doc_type, "filename": xlsx_name})
+            except Exception as e:
+                logger.error("Failed to convert {} to XLSX: {}", ods_path.name, str(e))
+
+        # 3. Create ZIP: [Exchange]_[tax_year]_[email_username].zip
+        zip_name = f"{job.exchange}_{job.tax_year}_{email_username}.zip"
+        zip_path = job_dir / zip_name
+        logger.info("Creating ZIP archive: {}", zip_name)
+        with zipfile.ZipFile(str(zip_path), 'w') as zipf:
+            # Add renamed ODS
+            for p in renamed_ods_paths.values():
+                zipf.write(str(p), p.name)
+            # Add XLSX
+            for p in excel_paths:
+                zipf.write(str(p), p.name)
+                
+        # Register ZIP
+        if zip_path.exists():
+            size = zip_path.stat().st_size
+            doc_id = job_service.register_document(
+                db=db,
+                job_id=job_id,
+                doc_type="zip_report",
+                storage_path=str(zip_path),
+                filename=zip_name,
+                mime_type="application/zip",
+                size=size
+            )
+            result_metadata["documents"].append({"id": doc_id, "type": "zip_report", "filename": zip_name})
+            attachments.append(zip_path)
+        
+        # Also keep original inputs and warnings in DB for reference (optional but good)
+        # Note: they are NOT added to attachments list
+        for doc_type, filename, mime in [
             ("input_ods", "crypto_data.ods", "application/vnd.oasis.opendocument.spreadsheet"),
             ("warnings", "warnings.txt", "text/plain")
-        ]
-        
-        if job.country.upper() == "ES":
-            files_to_register.append(("rp2_full_report", "tax_report_es.ods", "application/vnd.oasis.opendocument.spreadsheet"))
-        
-        for doc_type, filename, mime in files_to_register:
+        ]:
             file_path = job_dir / filename
             if file_path.exists():
-                size = file_path.stat().st_size
-                doc_id = job_service.register_document(
+                job_service.register_document(
                     db=db,
                     job_id=job_id,
                     doc_type=doc_type,
                     storage_path=str(file_path),
                     filename=filename,
                     mime_type=mime,
-                    size=size
+                    size=file_path.stat().st_size
                 )
-                attachments.append(file_path)
-                result_metadata["documents"].append({"id": doc_id, "type": doc_type, "filename": filename})
-        
+
         job_service.update_result_payload(db, job_id, result_metadata)
 
         # 7. Finalize Job
@@ -166,7 +256,8 @@ def process_job(job_payload: dict):
             country=job.country,
             exchange=job.exchange,
             year=job.tax_year,
-            attachments=attachments
+            attachments=attachments,
+            lang=job.lang
         )
         
         if email_success:
