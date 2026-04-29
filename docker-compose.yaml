@@ -105,10 +105,11 @@ services:
       # JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
       # DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
 
-      DATA_DIR: /data
+      PYTHONPATH: /app
+      DATA_DIR: /app/data
     volumes:
-      - ./worker:/app
-      - ./cryptax-data/worker:/data
+      - ./worker:/app/worker
+      - ./cryptax-data/worker:/app/data
     secrets:
       - source: mariadb_usr_password
         target: db_password
@@ -117,7 +118,7 @@ services:
       # - app_secret_key
       # - jwt_secret_key
       # - data_encryption_key
-    command: ["python", "worker/main.py"]
+    command: ["python", "-m", "worker.main"]
     networks:
       - backend
 

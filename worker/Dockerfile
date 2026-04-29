@@ -3,9 +3,9 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    WORKER_HOME=worker/
+    PYTHONPATH=/app
 
-WORKDIR ${WORKER_HOME}
+WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -18,17 +18,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN useradd -ms /bin/bash workeruser
 
+# Copy requirements first for better caching
 COPY worker/requirements.txt /tmp/requirements.txt
 
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install -r /tmp/requirements.txt
 
-# RUN mkdir -p /data/input /data/output /data/tmp && \
-#     chown -R workeruser:workeruser ${WORKER_HOME} /data
+# Copy the worker package
+COPY worker/ /app/worker/
 
-COPY . .
-RUN chown -R workeruser:workeruser ../worker
+# Ensure data directory exists and set permissions
+RUN mkdir -p /app/data && \
+    chown -R workeruser:workeruser /app
 
 USER workeruser
 
-# CMD ["python", "./main.py"]
+# Run the worker as a module
+CMD ["python", "-m", "worker.main"]
