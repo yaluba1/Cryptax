@@ -30,10 +30,28 @@ def test_enrich_transactions_with_prices():
         # Mock fetch_ohlcv returning 50000.0 as close price for BTC/EUR
         mock_exchange.fetch_ohlcv.return_value = [[0, 0, 0, 0, 50000.0, 0]]
         
+        # Test with default exchange (binance)
         DaliService.enrich_transactions_with_prices(transactions, "EUR")
         
         # Check if price was updated
         assert tx.constructor_parameter_dictionary[Keyword.SPOT_PRICE.value] == "50000.0"
+
+def test_enrich_transactions_with_prices_kraken():
+    tx = InTransaction(
+        plugin="test", unique_id="k1", raw_data="raw", timestamp="2023-10-01 12:00:00+00:00",
+        asset="ETH", exchange="Kraken", holder="Juan", transaction_type="BUY",
+        spot_price="__unknown", crypto_in="1.0"
+    )
+    transactions = [tx]
+    
+    with patch('ccxt.kraken') as mock_kraken:
+        mock_exchange = MagicMock()
+        mock_kraken.return_value = mock_exchange
+        mock_exchange.fetch_ohlcv.return_value = [[0, 0, 0, 0, 2000.0, 0]]
+        
+        DaliService.enrich_transactions_with_prices(transactions, "USD", "kraken")
+        
+        assert tx.constructor_parameter_dictionary[Keyword.SPOT_PRICE.value] == "2000.0"
 
 def test_enrich_transactions_fallback_price():
     # Create a mock transaction with unknown asset
@@ -70,7 +88,7 @@ def test_resolve_and_save(tmp_path):
     with patch('worker.services.dali_service.resolve_transactions') as mock_resolve:
         mock_resolve.return_value = [tx]
         
-        success = DaliService.resolve_and_save(job_dir, [tx], native_fiat)
+        success = DaliService.resolve_and_save(job_dir, [tx], native_fiat, "Binance", "Juan")
         
         assert success is True
         assert (job_dir / "crypto_data.ini").exists()
@@ -103,7 +121,7 @@ def test_cleanup_unknown_values(tmp_path):
     
     transactions = [tx_intra, tx_in]
     
-    DaliService._cleanup_unknown_values(transactions, job_dir)
+    DaliService._cleanup_unknown_values(transactions, job_dir, "Binance", "Juan")
     
     # Verify IntraTransaction fallback (received = sent)
     assert tx_intra.constructor_parameter_dictionary[Keyword.CRYPTO_RECEIVED.value] == "10.0"

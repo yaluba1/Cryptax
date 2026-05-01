@@ -60,23 +60,35 @@ def process_job(job_payload: dict):
         request_payload = job.request_payload_json
         fiat = request_payload.get("fiat", "USD")
         
-        # NEW: Enriched Binance workflow to avoid Kraken hanging problem
-        if job.exchange.lower() in ['binance', 'binance.com']:
-            logger.info("Using enriched Binance workflow for job {}", job_id)
+        # NEW: Enriched workflow to avoid Kraken hanging/CSV problem and ensure high reliability
+        if job.exchange.lower() in ['binance', 'binance.com', 'kraken']:
+            logger.info("Using enriched {} workflow for job {}", job.exchange, job_id)
             
-            # a. Get transactions directly from Binance
-            job_service.add_job_event(db, job_id, "binance_fetch", "Fetching raw transactions from Binance REST API")
-            transactions = dali_service.get_binance_transactions(
-                account_holder=job.account_holder,
-                api_key=api_key,
-                api_secret=api_secret,
-                native_fiat=fiat,
-                country_code=job.country
-            )
+            # a. Get transactions directly from Exchange
+            if job.exchange.lower() == 'kraken':
+                job_service.add_job_event(db, job_id, "kraken_fetch", "Fetching raw transactions from Kraken REST API")
+                transactions = dali_service.get_kraken_transactions(
+                    account_holder=job.account_holder,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    native_fiat=fiat,
+                    country_code=job.country,
+                    job_dir=job_dir
+                )
+            else:
+                job_service.add_job_event(db, job_id, "binance_fetch", "Fetching raw transactions from Binance REST API")
+                transactions = dali_service.get_binance_transactions(
+                    account_holder=job.account_holder,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    native_fiat=fiat,
+                    country_code=job.country,
+                    job_dir=job_dir
+                )
             
             # b. Enrich with prices via CCXT
-            job_service.add_job_event(db, job_id, "price_enrichment", f"Enriching {len(transactions)} transactions with historical prices from Binance")
-            dali_service.enrich_transactions_with_prices(transactions, fiat)
+            job_service.add_job_event(db, job_id, "price_enrichment", f"Enriching {len(transactions)} transactions with historical prices from {job.exchange}")
+            dali_service.enrich_transactions_with_prices(transactions, fiat, job.exchange)
             
             # c. Resolve and Save (generates crypto_data.ini and crypto_data.ods)
             job_service.add_job_event(db, job_id, "dali_finalizing", "Resolving transactions and generating final output files")
@@ -242,6 +254,8 @@ def process_job(job_payload: dict):
                     mime_type=mime,
                     size=file_path.stat().st_size
                 )
+            else:
+                logger.debug("Optional file {} not found, skipping registration.", filename)
 
         job_service.update_result_payload(db, job_id, result_metadata)
 

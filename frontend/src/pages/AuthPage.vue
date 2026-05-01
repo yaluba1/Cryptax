@@ -1,7 +1,7 @@
 <template>
   <q-page class="flex flex-center">
     <div class="auth-container q-pa-md shadow-2 rounded-borders">
-      <hanko-auth
+      <hanko-login
         :api="hankoApiUrl"
         :lang="hankoLang"
         @onAuthFlowCompleted="onSessionReady"
@@ -25,6 +25,8 @@ import { register } from '@teamhanko/hanko-elements';
 import { all } from '@teamhanko/hanko-elements/i18n/all';
 import { useAuthSessionStore } from 'stores/authSessionStore';
 import { useAppStore } from 'stores/appStore';
+import { es } from '../i18n/hanko/es-ES';
+import { ja } from '../i18n/hanko/ja';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -34,8 +36,11 @@ const appStore = useAppStore();
 
 const hankoApiUrl = process.env.HANKO_API_URL || '';
 
-/** Map current app language to Hanko supported codes (2 letters) */
-const hankoLang = computed(() => appStore.language.substring(0, 2));
+/** Map current app language to Hanko supported codes */
+const hankoLang = computed(() => {
+  const lang = appStore.language.substring(0, 2);
+  return lang === 'pt' ? 'ptBR' : lang;
+});
 
 async function onSessionReady() {
   console.info('[AuthPage] Hanko session ready');
@@ -76,7 +81,12 @@ onMounted(async () => {
   try {
     await register(hankoApiUrl, {
       fallbackLanguage: 'en',
-      translations: all,
+      enablePasskeys: false,
+      hidePasskeyButtonOnLogin: true,
+      // Provide all built-in translations plus our custom Spanish overrides
+      translations: { ...all, es, ja },
+      // Re-validate the session cookie every 60 seconds in the background
+      sessionCheckInterval: 60_000,
     });
     console.info('[AuthPage] Hanko elements registered');
   } catch (e) {

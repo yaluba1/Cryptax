@@ -33,8 +33,36 @@ def test_generate_config_binance(tmp_path):
     assert 'default_exchange' not in config['dali.plugin.pair_converter.ccxt_binance']
     assert 'dali.plugin.pair_converter.ccxt' not in config
 
+def test_generate_config_kraken(tmp_path):
+    job_dir = tmp_path
+    account_holder = "test@example.com"
+    exchange = "kraken"
+    api_key = "test_key"
+    api_secret = "test_secret"
+    native_fiat = "USD"
+    
+    config_path = DaliService.generate_config(
+        job_dir, account_holder, exchange, api_key, api_secret, native_fiat
+    )
+    
+    assert config_path.exists()
+    
+    config = configparser.ConfigParser()
+    config.read(config_path)
+    
+    # Check input plugin
+    assert 'dali.plugin.input.rest.kraken' in config
+    assert config['dali.plugin.input.rest.kraken']['account_holder'] == account_holder
+    assert config['dali.plugin.input.rest.kraken']['api_key'] == api_key
+    assert config['dali.plugin.input.rest.kraken']['api_secret'] == api_secret
+    assert config['dali.plugin.input.rest.kraken']['native_fiat'] == "USD"
+    
+    # Check pair converter plugin
+    assert 'dali.plugin.pair_converter.ccxt_kraken' in config
+    assert config['dali.plugin.pair_converter.ccxt_kraken']['historical_price_type'] == 'high'
+
 def test_generate_config_unsupported(tmp_path):
-    with pytest.raises(ValueError, match="Exchange 'kraken' not supported yet"):
+    with pytest.raises(ValueError, match="Exchange 'coinbase' not supported yet"):
         DaliService.generate_config(
-            tmp_path, "test@example.com", "kraken", "key", "secret", "USD"
+            tmp_path, "test@example.com", "coinbase", "key", "secret", "USD"
         )
