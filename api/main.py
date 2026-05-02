@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.staticfiles import StaticFiles
 from api.routes import health, jobs
 from api.logging_config import logger
 from api.config import settings
@@ -17,13 +19,34 @@ app = FastAPI(
     title="CrypTax API",
     description="API for tax processing services for crypto brokers (Binance, Coinbase, Kraken).",
     version="1.0.0",
-    docs_url="/api/v1/docs",
+    docs_url=None,  # Disable automatic docs to use custom favicon
+    redoc_url=None,
     openapi_url="/api/v1/openapi.json",
     lifespan=lifespan,
     responses={
         503: {"description": "Service Unavailable - The server is currently unable to handle the request due to a temporary overloading or maintenance of the server."}
     }
 )
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="api/static"), name="static")
+
+@app.get("/api/v1/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=app.title + " - Swagger UI",
+        oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+        swagger_favicon_url="/static/favicon.png"
+    )
+
+@app.get("/api/v1/redoc", include_in_schema=False)
+async def redoc_html():
+    return get_redoc_html(
+        openapi_url=app.openapi_url,
+        title=app.title + " - ReDoc",
+        redoc_favicon_url="/static/favicon.png"
+    )
 
 from sqlalchemy.exc import OperationalError, InternalError
 from redis.exceptions import ConnectionError as RedisConnectionError
