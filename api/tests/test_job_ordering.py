@@ -3,8 +3,13 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from api.main import app
 from api.database import get_db
+from api.auth import get_current_user
 
 client = TestClient(app)
+
+# Mock user for auth dependency
+async def mock_get_current_user():
+    return "user123"
 
 @patch("api.services.job_service.rq_service.enqueue_job")
 def test_create_job_db_failure_prevents_redis(mock_enqueue):
@@ -12,6 +17,7 @@ def test_create_job_db_failure_prevents_redis(mock_enqueue):
     mock_db = MagicMock()
     mock_db.commit.side_effect = Exception("Database Commit Failed")
     app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[get_current_user] = mock_get_current_user
     
     job_payload = {
         "country": "ES",
@@ -44,6 +50,7 @@ def test_create_job_success_order(mock_enqueue):
     
     mock_db.commit.side_effect = mock_commit
     app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[get_current_user] = mock_get_current_user
     
     job_payload = {
         "country": "ES",

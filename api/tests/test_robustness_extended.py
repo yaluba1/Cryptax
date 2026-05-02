@@ -9,6 +9,11 @@ client = TestClient(app, raise_server_exceptions=False)
 
 from sqlalchemy.exc import OperationalError
 from redis.exceptions import ConnectionError as RedisConnectionError
+from api.auth import get_current_user
+
+# Mock user for auth dependency
+async def mock_get_current_user():
+    return "user123"
 
 def test_post_jobs_db_auth_error():
     # Mock a dependency to raise an OperationalError (auth error)
@@ -18,8 +23,10 @@ def test_post_jobs_db_auth_error():
         raise err
     
     app.dependency_overrides[get_db] = mock_db_auth_error
+    app.dependency_overrides[get_current_user] = mock_get_current_user
     
     payload = {
+        "country": "ES",
         "exchange": "binance",
         "year": 2023,
         "account_holder": "test@example.com",
@@ -39,8 +46,10 @@ def test_post_jobs_db_auth_error():
 def test_post_jobs_redis_connection_error(mock_enqueue):
     # Mock Redis ConnectionError
     mock_enqueue.side_effect = RedisConnectionError("Error connecting to Redis")
+    app.dependency_overrides[get_current_user] = mock_get_current_user
     
     payload = {
+        "country": "ES",
         "exchange": "binance",
         "year": 2023,
         "account_holder": "test@example.com",

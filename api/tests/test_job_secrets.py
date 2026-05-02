@@ -3,15 +3,21 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from api.main import app
 from api.database import get_db
+from api.auth import get_current_user
 from api.pydantic_models import InternalJob
 
 client = TestClient(app)
 
+# Mock user for auth dependency
+async def mock_get_current_user():
+    return "user123"
+
 @patch("api.services.job_service.rq_service.enqueue_job")
 def test_create_job_country_handling(mock_enqueue):
-    # Mock database session
+    # Mock database session and auth
     mock_db = MagicMock()
     app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[get_current_user] = mock_get_current_user
     
     # 1. Test standard country (ES)
     job_payload = {

@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     log_retention: str = "31 days"
     log_compression: str = "zip"
 
+    # Hanko Authentication
+    hanko_api_url: str = "https://7608898b-488d-4cec-b8df-acd233a92873.hanko.io"
+    jwks_url: str = "https://7608898b-488d-4cec-b8df-acd233a92873.hanko.io/.well-known/jwks.json"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

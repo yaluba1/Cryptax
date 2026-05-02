@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy.orm import Session
 from api.models import Job, JobEvent, Document
-from api.pydantic_models import JobRequestBody, InternalJob, JobListItem, DocumentInfo, JobStatusEnum
+from api.pydantic_models import JobRequestBody, InternalJob, JobListItem, DocumentInfo, JobStatusEnum, GenericInfo
 from api.rq_service import rq_service
 from loguru import logger
 import json
@@ -57,14 +57,14 @@ class JobService:
             rq_service.enqueue_job(internal_job)
         except Exception as e:
             logger.error(f"Failed to enqueue job {job_id} in Redis: {str(e)}")
-            # We don't raise here because the job IS created in DB. 
-            # In a real system, we might want to update the job status to 'error' or 'failed_to_queue'.
+            # Raise here to trigger the global 503 exception handler
+            raise e
         
         return job_id
 
-    def get_jobs_for_account(self, db: Session, account_holder: str) -> list[JobListItem]:
-        """Retrieve all jobs for an account holder."""
-        jobs = db.query(Job).filter(Job.account_holder == account_holder).all()
+    def get_jobs_for_account(self, db: Session, account_holder: str, uid: str) -> list[JobListItem]:
+        """Retrieve all jobs for an account holder and UID."""
+        jobs = db.query(Job).filter(Job.account_holder == account_holder, Job.uid == uid).all()
         
         result = []
         for job in jobs:
@@ -101,8 +101,8 @@ class JobService:
         
         return result
 
-    def get_document(self, db: Session, document_id: str) -> Document:
-        """Retrieve document metadata by ID."""
-        return db.query(Document).filter(Document.id == document_id).first()
+    def get_document(self, db: Session, document_id: str, uid: str) -> Document:
+        """Retrieve document metadata by ID, verifying ownership via UID."""
+        return db.query(Document).join(Job).filter(Document.id == document_id, Job.uid == uid).first()
 
 job_service = JobService()
