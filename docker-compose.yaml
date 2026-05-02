@@ -94,6 +94,9 @@ services:
       REDIS_PORT: 6379
       REDIS_DB: 0
 
+      EMAIL_SMTP_PORT: 587
+      EMAIL_SMTP_CYPHER: STARTTLS
+
       # S3_ENDPOINT: http://minio:9000
       # S3_ACCESS_KEY_FILE: /run/secrets/minio_root_user
       # S3_SECRET_KEY_FILE: /run/secrets/minio_root_password
@@ -108,11 +111,17 @@ services:
       PYTHONPATH: /app
       DATA_DIR: /app/data
     volumes:
-      - ./worker:/app/worker
-      - ./cryptax-data/worker:/app/data
+      - ./cryptax-data/worker/logs:/app/logs
+      - ./cryptax-data/worker/data:/app/data
     secrets:
       - source: mariadb_usr_password
         target: db_password
+      - source: email_smtp_server
+        target: email_smtp_svr
+      - source: email_account_name
+        target: email_acc_name
+      - source: email_account_password
+        target: email_acc_pwd
       # - minio_root_user
       # - minio_root_password
       # - app_secret_key
@@ -122,64 +131,72 @@ services:
     networks:
       - backend
 
-  # api:
-  #   build:
-  #     context: .
-  #     dockerfile: ./api/Dockerfile
-  #   container_name: cryptax-api
-  #   restart: unless-stopped
-  #   depends_on:
-  #     # mariadb:
-  #     #   condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #     # minio:
-  #     #   condition: service_healthy
-  #   environment:
-  #     # TZ: Europe/Madrid
+  api:
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+    container_name: cryptax-api
+    restart: unless-stopped
+    depends_on:
+      # mariadb:
+      #   condition: service_healthy
+      redis:
+        condition: service_healthy
+      # minio:
+      #   condition: service_healthy
+    environment:
+      # TZ: Europe/Madrid
 
-  #     # APP_ENV: local
+      # APP_ENV: local
 
-  #     DB_HOST: 192.168.77.109
-  #     DB_PORT: 3306
-  #     DB_NAME: cryptax
-  #     DB_USER: yalcryptax
+      DB_HOST: 192.168.77.109
+      DB_PORT: 3306
+      DB_NAME: cryptax
+      DB_USER: yalcryptax
 
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
-  #     REDIS_DB: 0
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
 
-  #     # S3_ENDPOINT: http://minio:9000
-  #     # S3_ACCESS_KEY_FILE: /run/secrets/api_key
-  #     # S3_SECRET_KEY_FILE: /run/secrets/api_secret
-  #     # S3_BUCKET: cryptotax
-  #     # S3_REGION: eu-south-2
-  #     # S3_SECURE: "false"
+      # S3_ENDPOINT: http://minio:9000
+      # S3_ACCESS_KEY_FILE: /run/secrets/api_key
+      # S3_SECRET_KEY_FILE: /run/secrets/api_secret
+      # S3_BUCKET: cryptotax
+      # S3_REGION: eu-south-2
+      # S3_SECURE: "false"
 
-  #     # APP_SECRET_KEY_FILE: /run/secrets/app_secret_key
-  #     # JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
-  #     # DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
+      # APP_SECRET_KEY_FILE: /run/secrets/app_secret_key
+      # JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      # DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
 
-  #     PYTHONPATH: /worker
-  #     #  DATA_DIR: /data
-  #   volumes:
-  #     - ./cryptax-data/api:/worker/data
-  #     - ./cryptax-data/api/logs:/worker/logs
-  #   secrets:
-  #     - source: mariadb_usr_password
-  #       target: db_password
-  #     # - minio_root_user
-  #     # - minio_root_password
-  #     # - app_secret_key
-  #     # - jwt_secret_key
-  #     # - data_encryption_key
-  #   command: ["python", "./main.py"]
-  #   networks:
-  #     - backend
+      PYTHONPATH: /worker
+      #  DATA_DIR: /data
+    ports:
+      - 8000:8000
+    volumes:
+      - ./cryptax-data/worker/data:/app/data
+      - ./cryptax-data/api/logs:/app/logs
+    secrets:
+      - source: mariadb_usr_password
+        target: db_password
+      # - minio_root_user
+      # - minio_root_password
+      # - app_secret_key
+      # - jwt_secret_key
+      # - data_encryption_key
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    networks:
+      - backend
 
 secrets:
   mariadb_usr_password:
     file: ./secrets/mariadb_usr_password.txt
+  email_smtp_server:
+    file: ./secrets/email_smtp_server.txt
+  email_account_name:
+    file: ./secrets/email_account_name.txt
+  email_account_password:
+    file: ./secrets/email_account_password.txt
   # mariadb_root_password:
   #   file: ./secrets/mariadb_db_root_password.txt
   # minio_root_user:

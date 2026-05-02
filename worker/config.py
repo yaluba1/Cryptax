@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     email_smtp_port: int = 587
     email_smtp_cypher: str = "STARTTLS"
     email_acc_name: str = "info@cryptax.com"
-    email_acc_pws: str = "password"
+    email_acc_pwd: str = "password"
 
     model_config = SettingsConfigDict(
         env_file=".env",

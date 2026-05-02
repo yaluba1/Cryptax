@@ -16,8 +16,8 @@ COPY api/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install -r /tmp/requirements.txt
 
-RUN mkdir -p /data/input /data/output /data/tmp /app/logs && \
-    chown -R appuser:appuser ${APP_HOME} /data && \
+RUN mkdir -p /app/data /app/logs && \
+    chown -R appuser:appuser /app/data && \
     chown -R appuser:appuser /app/logs
 
 COPY api ${APP_HOME}/api

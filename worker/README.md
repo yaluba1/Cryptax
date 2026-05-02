@@ -21,7 +21,7 @@ The CrypTax Worker is an asynchronous processing service based on Redis Queue (R
 ### Configuration
 Configure the environment variables in `.env`:
 - `REDIS_HOST`, `REDIS_PORT`
-- `EMAIL_SMTP_SVR`, `EMAIL_ACC_NAME`, `EMAIL_ACC_PWS` (for notifications)
+- `EMAIL_SMTP_SVR`, `EMAIL_ACC_NAME`, `EMAIL_ACC_PWD` (for notifications)
 
 ### Running Locally
 To start a worker and listen for jobs:

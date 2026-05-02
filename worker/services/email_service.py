@@ -94,7 +94,7 @@ class EmailService:
                 if settings.email_smtp_cypher == "STARTTLS":
                     server.starttls()
                 
-                server.login(settings.email_acc_name, settings.email_acc_pws)
+                server.login(settings.email_acc_name, settings.email_acc_pwd)
                 server.send_message(msg)
                 
             logger.info("Email sent successfully to {}", recipient_email)
