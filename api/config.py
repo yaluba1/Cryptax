@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # Hanko Authentication
     hanko_api_url: str = "https://7608898b-488d-4cec-b8df-acd233a92873.hanko.io"
     jwks_url: str = "https://7608898b-488d-4cec-b8df-acd233a92873.hanko.io/.well-known/jwks.json"
+    jwt_audience: str = "cryptax.yaluba.org"
 
     model_config = SettingsConfigDict(
         env_file=".env",

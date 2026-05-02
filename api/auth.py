@@ -32,7 +32,7 @@ async def get_current_user(token: HTTPAuthorizationCredentials = Depends(securit
             token.credentials,
             signing_key.key,
             algorithms=["RS256"],
-            audience=settings.hanko_api_url, # Aud should match Hanko API URL
+            audience=settings.jwt_audience,
             issuer=settings.hanko_api_url,   # Iss should match Hanko API URL
         )
         
