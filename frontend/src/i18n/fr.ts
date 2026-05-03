@@ -29,6 +29,17 @@ export default {
       error: 'Erreur',
     },
     noData: 'Aucun rapport fiscal trouvé.',
+    delete: {
+      title: 'Supprimer le rapport fiscal',
+      warning: 'Avertissement : Cette action supprimera complètement le rapport fiscal du système. Tous les documents associés seront définitivement effacés. Cette action ne peut pas être annulée.',
+      confirmText: 'Tapez DELETE pour confirmer',
+      button: 'Supprimer',
+      cancel: 'Annuler',
+      success: 'Rapport fiscal supprimé avec succès',
+      error: 'Échec de la suppression du rapport fiscal',
+      unauthorized: 'Vous n\'êtes pas autorisé à supprimer ce rapport',
+      notFound: 'Rapport fiscal non trouvé',
+    },
   },
   newJob: {
     title: 'Demander un nouveau rapport fiscal',

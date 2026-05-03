@@ -17,6 +17,14 @@ The CrypTax API is a FastAPI-based service responsible for managing cryptocurren
 - **Logging**: Loguru
 - **Validation**: Pydantic
 
+## Core Endpoints
+
+- **Health Check**: `GET /api/v1/health` - System status.
+- **Job Creation**: `POST /api/v1/jobs` - Create a new tax processing job (JWT required).
+- **Job Listing**: `GET /api/v1/jobs` - List jobs for an account (JWT required).
+- **Job Deletion**: `DELETE /api/v1/jobs/{job_id}` - Remove a job and its data (JWT required).
+- **Document Download**: `GET /api/v1/documents/{id}/download` - Download reports (JWT required).
+
 ## Getting Started
 
 ### Configuration

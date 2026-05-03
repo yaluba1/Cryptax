@@ -29,6 +29,17 @@ export default {
       error: 'Fehler',
     },
     noData: 'Keine Steuerberichte gefunden.',
+    delete: {
+      title: 'Steuerbericht löschen',
+      warning: 'Warnung: Diese Aktion wird den Steuerbericht vollständig aus dem System löschen. Alle zugehörigen Dokumente werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmText: 'Geben Sie DELETE ein, um zu bestätigen',
+      button: 'Löschen',
+      cancel: 'Abbrechen',
+      success: 'Steuerbericht erfolgreich gelöscht',
+      error: 'Fehler beim Löschen des Steuerberichts',
+      unauthorized: 'Sie sind nicht berechtigt, diesen Bericht zu löschen',
+      notFound: 'Steuerbericht nicht gefunden',
+    },
   },
   newJob: {
     title: 'Neuen Steuerbericht anfordern',

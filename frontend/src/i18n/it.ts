@@ -29,6 +29,17 @@ export default {
       error: 'Errore',
     },
     noData: 'Nessun rapporto fiscale trovato.',
+    delete: {
+      title: 'Elimina Rapporto Fiscale',
+      warning: 'Avvertenza: Questa azione eliminerà completamente il rapporto fiscale dal sistema. Tutti i documenti associati verranno cancellati in modo permanente. Questa azione non può essere annullata.',
+      confirmText: 'Scrivi DELETE per confermare',
+      button: 'Elimina',
+      cancel: 'Annulla',
+      success: 'Rapporto fiscale eliminato con successo',
+      error: 'Errore durante l\'eliminazione del rapporto fiscale',
+      unauthorized: 'Non sei autorizzato a eliminare questo rapporto',
+      notFound: 'Rapporto fiscale non trovato',
+    },
   },
   newJob: {
     title: 'Richiedi Nuovo Rapporto Fiscale',

@@ -1,4 +1,5 @@
 # CrypTax
+
 Free SaaS Solution to calculate taxes for crypto accounts.
 
 ## SaaS version
@@ -13,15 +14,15 @@ The SaaS version is currently hosted in:
 
 ### Alpha
 
-Current support is limited to *Binance* and *Kraken* , which are the two I use. I will add others in future versions. You may help me with that, if you use other.
+Current support is limited to _Binance_ and _Kraken_ , which are the two I use. I will add others in future versions. You may help me with that, if you use other.
 
 I opened my accounts in these crypto exchanges a few years back and I have quite a few transactions that DaLI/RP2 could not handle correctly (old cryptos, airdrops, etc). I need to look into this, because the result is not 100% correct. But for activity in the last couple of years and for major cryptos (BTC, ETH, SOL, etc.), it works well.
 
 **URL**: [Cryptax](https://cryptax.yaluba.org) -> https://cryptax.yaluba.org
 
-**Access**: by invitation only. Send me an email to *cryptax[at]yaluba[dot]com* if you want to try it. 
+**Access**: by invitation only. Send me an email to _cryptax[at]yaluba[dot]com_ if you want to try it.
 
-:radioactive: ***<span style="color:red">Use it at your own risk!!!</span>*** :radioactive:
+:radioactive: **_<span style="color:red">Use it at your own risk!!!</span>_** :radioactive:
 
 Feel free to mount your own access using the instructions below.
 
@@ -42,3 +43,11 @@ Containerized with the following open SW components:
 - [Redis](https://redis.io/)
 - [RP2](https://github.com/eprbell/rp2)
 
+## API
+
+Documentation for the API can be found in its [Readme](api/README.md) file . Swagger is published [here](https://cryptax-worker.yaluba.org/api/v1/docs) and json docs [here](https://cryptax-worker.yaluba.org/api/v1/openapi.json).
+
+## Worker
+
+The worker runs as a separate container and is responsible for retrieving the data from the exchanges and generating the tax reports. A "modified" version of DaLI is used for the first and RP2 for the second step.
+Details can be found in the [Readme](worker/README.md).

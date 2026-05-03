@@ -29,6 +29,17 @@ export default {
       error: 'Erro',
     },
     noData: 'Nenhum relatório fiscal encontrado.',
+    delete: {
+      title: 'Excluir Relatório Fiscal',
+      warning: 'Aviso: Esta ação excluirá completamente o relatório fiscal do sistema. Todos os documentos associados serão apagados permanentemente. Esta ação não pode ser desfeita.',
+      confirmText: 'Digite DELETE para confirmar',
+      button: 'Excluir',
+      cancel: 'Cancelar',
+      success: 'Relatório fiscal excluído com sucesso',
+      error: 'Falha ao excluir o relatório fiscal',
+      unauthorized: 'Você não tem autorização para excluir este relatório',
+      notFound: 'Relatório fiscal não encontrado',
+    },
   },
   newJob: {
     title: 'Solicitar Novo Relatório Fiscal',

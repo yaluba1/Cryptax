@@ -66,3 +66,24 @@ def download_document(
         filename=doc.original_filename,
         media_type=doc.mime_type
     )
+
+@router.delete("/jobs/{job_id}", status_code=204)
+def delete_job(
+    job_id: str, 
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """Delete a tax processing job and its associated data."""
+    result = job_service.delete_job(db, job_id, user_id)
+    
+    if result is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if result is False:
+        logger.warning(f"Unauthorized deletion attempt for job {job_id} by user {user_id}")
+        raise HTTPException(
+            status_code=401, 
+            detail="Access denied. You do not own this job."
+        )
+    
+    return None # 204 No Content

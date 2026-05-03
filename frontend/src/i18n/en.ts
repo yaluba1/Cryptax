@@ -29,6 +29,17 @@ export default {
       error: 'Error',
     },
     noData: 'No tax reports found.',
+    delete: {
+      title: 'Delete Tax Report',
+      warning: 'Warning: This action will completely delete the tax report from the system. All associated documents will be permanently erased. This action cannot be undone.',
+      confirmText: 'Type DELETE to confirm',
+      button: 'Delete',
+      cancel: 'Cancel',
+      success: 'Tax report deleted successfully',
+      error: 'Failed to delete tax report',
+      unauthorized: 'You are not authorized to delete this report',
+      notFound: 'Tax report not found',
+    },
   },
   newJob: {
     title: 'Request New Tax Report',

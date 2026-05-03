@@ -6,6 +6,9 @@ from api.rq_service import rq_service
 from loguru import logger
 import json
 from datetime import datetime
+from typing import Optional
+import shutil
+from api.config import settings
 
 class JobService:
     def create_job(self, db: Session, job_request: JobRequestBody) -> str:
@@ -104,5 +107,37 @@ class JobService:
     def get_document(self, db: Session, document_id: str, uid: str) -> Document:
         """Retrieve document metadata by ID, verifying ownership via UID."""
         return db.query(Document).join(Job).filter(Document.id == document_id, Job.uid == uid).first()
+
+    def delete_job(self, db: Session, job_id: str, uid: str) -> Optional[bool]:
+        """
+        Delete a job from DB and filesystem.
+        Returns:
+            True: if deleted successfully.
+            False: if job exists but UID mismatch.
+            None: if job does not exist.
+        """
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return None
+        
+        if job.uid != uid:
+            return False
+        
+        # 1. Delete from database (cascades handle events and documents)
+        db.delete(job)
+        db.commit()
+        logger.info(f"Job {job_id} deleted from database.")
+        
+        # 2. Delete from filesystem
+        job_dir = settings.jobs_data_dir / job_id
+        if job_dir.exists() and job_dir.is_dir():
+            try:
+                shutil.rmtree(job_dir)
+                logger.info(f"Job directory {job_dir} deleted from filesystem.")
+            except Exception as e:
+                logger.error(f"Failed to delete job directory {job_dir}: {str(e)}")
+                # We don't raise here as the DB record is already gone.
+        
+        return True
 
 job_service = JobService()

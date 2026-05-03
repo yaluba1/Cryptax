@@ -59,7 +59,54 @@
             </div>
           </q-td>
         </template>
+
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props" class="text-right">
+            <q-btn
+              flat
+              round
+              color="negative"
+              icon="delete"
+              @click="openDeleteDialog(props.row.job_id)"
+            >
+              <q-tooltip>{{ $t('jobs.delete.button') }}</q-tooltip>
+            </q-btn>
+          </q-td>
+        </template>
       </q-table>
+
+      <q-dialog v-model="confirmDialog" persistent>
+        <q-card style="min-width: 400px">
+          <q-card-section class="row items-center">
+            <q-avatar icon="warning" color="negative" text-color="white" />
+            <span class="q-ml-sm text-h6">{{ $t('jobs.delete.title') }}</span>
+          </q-card-section>
+
+          <q-card-section class="q-pt-none">
+            <div class="text-subtitle2 text-negative q-mb-md">
+              {{ $t('jobs.delete.warning') }}
+            </div>
+            <q-input
+              v-model="confirmWord"
+              :label="$t('jobs.delete.confirmText')"
+              outlined
+              dense
+              autofocus
+              @keyup.enter="confirmWord === 'DELETE' && confirmDelete()"
+            />
+          </q-card-section>
+
+          <q-card-actions align="right">
+            <q-btn flat :label="$t('jobs.delete.cancel')" color="primary" v-close-popup />
+            <q-btn
+              :label="$t('jobs.delete.button')"
+              color="negative"
+              :disabled="confirmWord !== 'DELETE'"
+              @click="confirmDelete"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
 
       <q-btn
         color="primary"
@@ -74,11 +121,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useJobStore, type JobStatus } from 'stores/jobStore';
 import { useAuthSessionStore } from 'stores/authSessionStore';
 import { api } from 'boot/axios';
+import axios from 'axios';
 import { useQuasar, type QTableColumn } from 'quasar';
 
 const { t } = useI18n();
@@ -93,7 +141,42 @@ const columns = computed<QTableColumn[]>(() => [
   { name: 'fiat', label: t('jobs.table.fiat'), field: 'fiat', align: 'center', sortable: true },
   { name: 'status', label: t('jobs.table.status'), field: 'status', align: 'center', sortable: true },
   { name: 'documents', label: t('jobs.table.documents'), field: 'documents', align: 'left' },
+  { name: 'actions', label: '', field: 'actions', align: 'right' },
 ]);
+
+const confirmDialog = ref(false);
+const confirmWord = ref('');
+const jobToDelete = ref<string | null>(null);
+
+function openDeleteDialog(jobId: string) {
+  jobToDelete.value = jobId;
+  confirmWord.value = '';
+  confirmDialog.value = true;
+}
+
+async function confirmDelete() {
+  if (!jobToDelete.value || confirmWord.value !== 'DELETE') return;
+  
+  try {
+    await api.delete(`/jobs/${jobToDelete.value}`);
+    $q.notify({ type: 'positive', message: t('jobs.delete.success') });
+    await fetchJobs();
+  } catch (error: unknown) {
+    console.error('Delete failed:', error);
+    let message = t('jobs.delete.error');
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        message = t('jobs.delete.unauthorized');
+      } else if (error.response?.status === 404) {
+        message = t('jobs.delete.notFound');
+      }
+    }
+    $q.notify({ type: 'negative', message });
+  } finally {
+    confirmDialog.value = false;
+    jobToDelete.value = null;
+  }
+}
 
 async function fetchJobs() {
   if (!authStore.email) return;

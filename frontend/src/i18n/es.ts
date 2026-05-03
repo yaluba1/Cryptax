@@ -29,6 +29,17 @@ export default {
       error: 'Error',
     },
     noData: 'No se encontraron informes fiscales.',
+    delete: {
+      title: 'Eliminar Informe Fiscal',
+      warning: 'Advertencia: Esta acción eliminará completamente el informe fiscal del sistema. Todos los documentos asociados serán borrados permanentemente. Esta acción no se puede deshacer.',
+      confirmText: 'Escriba DELETE para confirmar',
+      button: 'Eliminar',
+      cancel: 'Cancelar',
+      success: 'Informe fiscal eliminado con éxito',
+      error: 'Error al eliminar el informe fiscal',
+      unauthorized: 'No tiene autorización para eliminar este informe',
+      notFound: 'Informe fiscal no encontrado',
+    },
   },
   newJob: {
     title: 'Solicitar Nuevo Informe Fiscal',
