@@ -49,11 +49,24 @@
       <router-view />
     </q-page-container>
 
-    <q-footer class="bg-grey-9 text-white q-pa-sm">
-      <div class="text-center">
-        <a href="https://www.yaluba.com" target="_blank" class="text-white text-decoration-none">
-          {{ $t('common.copyright', { year: new Date().getFullYear() }) }}
-        </a>
+    <q-footer class="bg-grey-9 text-white q-pa-md">
+      <div class="row items-center full-width">
+        <div class="col">
+          <a href="https://github.com/yaluba1/Cryptax" target="_blank" class="row items-center q-gutter-xs text-white text-decoration-none hover-opacity" style="width: fit-content">
+            <img src="~assets/Github_logo.svg" alt="GitHub" class="github-logo" />
+            <span class="text-caption text-weight-medium">CrypTax</span>
+          </a>
+        </div>
+        
+        <div class="col text-center">
+          <a href="https://www.yaluba.com" target="_blank" class="text-white text-decoration-none hover-opacity">
+            {{ $t('common.copyright', { year: new Date().getFullYear() }) }}
+          </a>
+        </div>
+        
+        <div class="col">
+          <!-- Empty column to ensure center text is perfectly centered -->
+        </div>
       </div>
     </q-footer>
   </q-layout>
@@ -106,5 +119,17 @@ function handleLogoError(e: Event) {
 }
 .text-decoration-none {
   text-decoration: none;
+}
+.github-logo {
+  height: 24px;
+  width: 24px;
+  filter: invert(1); /* Since it's a dark footer, make logo white if it's black */
+  transition: opacity 0.3s ease;
+}
+.github-logo:hover {
+  opacity: 0.7;
+}
+.hover-opacity:hover {
+  opacity: 0.7;
 }
 </style>
