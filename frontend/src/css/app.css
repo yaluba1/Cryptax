@@ -1,1 +1,35 @@
 /* app global css */
+
+/* Hanko Dark Mode Customization */
+.body--dark hanko-auth,
+.body--dark hanko-login,
+.body--dark hanko-profile {
+  --color: #e0e0e0;
+  --color-shade-1: #a0a0a0;
+  --color-shade-2: #333333;
+  --brand-color: #1976d2;
+  --brand-color-shade-1: #2196f3;
+  --brand-contrast-color: white;
+  --background-color: #1d1d1d;
+  --error-color: #ff5252;
+  --link-color: #2196f3;
+}
+
+/* Autofill Theme Customization (Overrides browser default yellow background) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #000000 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.body--dark input:-webkit-autofill,
+.body--dark input:-webkit-autofill:hover, 
+.body--dark input:-webkit-autofill:focus, 
+.body--dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #1d1d1d inset !important;
+  -webkit-text-fill-color: #e0e0e0 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}

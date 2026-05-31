@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from api.database import get_db
 from api.pydantic_models import JobRequestBody, JobResponseBody, JobsResponseBody, JobListItem
@@ -87,3 +87,49 @@ def delete_job(
         )
     
     return None # 204 No Content
+
+@router.post("/jobs/{job_id}/bot-activity", status_code=200)
+async def upload_bot_activity(
+    job_id: str,
+    api_key: str = Form(..., description="Exchange API Key"),
+    api_secret: str = Form(..., description="Exchange API Secret"),
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """Upload Binance bot CSV files for a job and trigger delayed processing."""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided.")
+    
+    try:
+        # Save all uploaded files first
+        for file in files:
+            content = await file.read()
+            job_service.save_bot_activity_file(
+                db=db,
+                job_id=job_id,
+                filename=file.filename,
+                content=content,
+                mime_type=file.content_type,
+                size=len(content),
+                uid=user_id
+            )
+            
+        # Trigger processing by enqueuing to RQ after saving all files
+        job_service.enqueue_delayed_job(
+            db=db,
+            job_id=job_id,
+            api_key=api_key,
+            api_secret=api_secret,
+            uid=user_id
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error handling bot CSV upload for job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error while saving files.")
+        
+    return {"message": "Files uploaded successfully and job enqueued for processing."}

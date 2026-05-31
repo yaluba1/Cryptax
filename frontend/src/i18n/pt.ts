@@ -6,6 +6,7 @@ export default {
     generate: 'Gerar Relatório Fiscal',
     loading: 'Carregando...',
     copyright: '© {year} Yaluba. Todos os direitos reservados.',
+    cancel: 'Cancelar',
   },
   auth: {
     loginSuccess: 'Login realizado com sucesso',
@@ -45,6 +46,13 @@ export default {
     title: 'Solicitar Novo Relatório Fiscal',
     accountHolder: 'E-mail do Titular da Conta',
     country: 'País de Residência Fiscal',
+    countries: {
+      IE: 'Irlanda (IE)',
+      JP: 'Japão (JP)',
+      ES: 'Espanha (ES)',
+      US: 'Estados Unidos (US)',
+      GENERIC: 'Genérico',
+    },
     year: 'Ano Fiscal',
     exchange: 'Exchange',
     apiKey: 'Chave API',
@@ -60,5 +68,51 @@ export default {
       duplicateJob: 'Um relatório fiscal para o mesmo país, ano fiscal, exchange e fiat já foi solicitado e está no estado {status}.',
     },
     success: 'Relatório fiscal solicitado com sucesso',
+    apiHelp: {
+      title: 'Como obter as Chaves API da {exchange}',
+      important: 'Aviso de Segurança Importante',
+      disclaimerTitle: 'Aviso Legal / Apenas Orientação',
+      disclaimerText: 'Estas instruções são fornecidas apenas como orientação geral. Você deve sempre verificar os procedimentos e detalhes mais recentes na plataforma ou documentação oficial da corretora.',
+      readOnlyWarning: 'Para sua segurança, certifique-se de que o par de chaves API tenha APENAS a permissão de Leitura (Read) habilitada. NÃO habilite negociação, saques (withdrawals) ou acesso de gravação.',
+      close: 'Fechar',
+      binance: {
+        intro: 'Para criar uma chave API de apenas leitura na Binance:',
+        step1: 'Faça login na sua conta Binance.',
+        step2: 'Vá para o ícone do seu Perfil (canto superior direito) e selecione \'Gerenciamento de API\'.',
+        step3: 'Clique em \'Criar API\' e escolha \'Gerada pelo sistema\'.',
+        step4: 'Em Restrições de API, certifique-se de que apenas \'Ativar Leitura\' esteja marcado.',
+        step5: 'Copie a Chave API e a Chave Secreta e cole-as neste formulário.'
+      },
+      kraken: {
+        intro: 'Para criar uma chave API de apenas leitura na Kraken:',
+        step1: 'Faça login na sua conta Kraken.',
+        step2: 'Clique no nome do seu Perfil no canto superior direito e selecione \'API\'.',
+        step3: 'Clique em \'Adicionar chave API\'.',
+        step4: 'Em \'Permissões da chave\', selecione APENAS as permissões de consulta/leitura (por exemplo, \'Consultar fundos\', \'Consultar ordens fechadas & negociações\', \'Consultar lançamentos contábeis\'). NÃO selecione nenhuma permissão de depósito, saque ou negociação.',
+        step5: 'Clique em \'Gerar chave\', depois copie a Chave API e a Chave Privada para este formulário.'
+      }
+    },
+    botHelp: {
+      title: 'Ajuda para Histórico CSV de Bots da Binance',
+      whenNeededTitle: 'Quando esses arquivos são necessários?',
+      whenNeededText: 'Se você utilizou bots de negociação Spot Grid ou Futures Grid na Binance durante o ano fiscal, as transações executadas por esses bots devem ser carregadas manualmente. A chave API padrão da Binance não expone as transações dos bots, portanto estes arquivos CSV são necessários para calcular com precisão seus ganhos de capital.',
+      howToGetTitle: 'Como obter arquivos CSV de bots na Binance:',
+      step1: 'Faça login na sua conta Binance em um navegador web.',
+      step2: 'Navegue para Trade -> Bots de Negociação (ou Grid Trading).',
+      step3: 'Vá em "Histórico" ou "Histórico de Ordens" na seção de Bots.',
+      step4: 'Selecione o histórico de grid trading relevante e clique em "Exportar". Escolha o intervalo de datas do ano fiscal.',
+      step5: 'Baixe os arquivos CSV gerados e envie-os aqui.',
+      exportLimitNote: 'Nota: Se o ano fiscal exceder o limite de exportação da Binance (por exemplo, 6 meses por arquivo), você pode exportar vários arquivos para diferentes períodos e enviar todos eles aqui.',
+      disclaimerText: 'Estas instruções são fornecidas apenas como orientação geral. Você deve sempre verificar os procedimentos de exportação mais recentes diretamente na plataforma oficial da Binance ou na documentação de suporte.'
+    },
+  },
+  tips: {
+    buyMeADrink: 'Pague-me uma bebida',
+    copyUri: 'Copiar URI',
+    copyAddress: 'Copiar endereço',
+    copied: 'Copiado para a área de transferência',
+    network: 'Rede',
+    chainId: 'ID da cadeia',
+    token: 'Token',
   },
 };

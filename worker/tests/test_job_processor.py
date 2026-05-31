@@ -19,7 +19,7 @@ def mock_job():
     job = Job(
         id="test-job-id",
         account_holder="test@example.com",
-        exchange="binance",
+        exchange="generic",
         country="ES",
         tax_year=2023,
         request_payload_json={"fiat": "EUR"},

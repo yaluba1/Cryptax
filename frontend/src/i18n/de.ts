@@ -6,6 +6,7 @@ export default {
     generate: 'Steuerbericht generieren',
     loading: 'Laden...',
     copyright: '© {year} Yaluba. Alle Rechte vorbehalten.',
+    cancel: 'Abbrechen',
   },
   auth: {
     loginSuccess: 'Anmeldung erfolgreich',
@@ -45,6 +46,13 @@ export default {
     title: 'Neuen Steuerbericht anfordern',
     accountHolder: 'E-Mail des Kontoinhabers',
     country: 'Land des steuerlichen Wohnsitzes',
+    countries: {
+      IE: 'Irland (IE)',
+      JP: 'Japan (JP)',
+      ES: 'Spanien (ES)',
+      US: 'Vereinigte Staaten (US)',
+      GENERIC: 'Allgemein',
+    },
     year: 'Steuerjahr',
     exchange: 'Börse',
     apiKey: 'API-Schlüssel',
@@ -60,5 +68,51 @@ export default {
       duplicateJob: 'Ein Steuerbericht für dasselbe Land, dasselbe Steuerjahr, dieselbe Börse und dasselbe Fiat wurde bereits angefordert und befindet sich im Status {status}.',
     },
     success: 'Steuerbericht erfolgreich angefordert',
+    apiHelp: {
+      title: 'So erhalten Sie {exchange}-API-Schlüssel',
+      important: 'Wichtiger Sicherheitshinweis',
+      disclaimerTitle: 'Haftungsausschluss / Nur zur Orientierung',
+      disclaimerText: 'Diese Anweisungen dienen nur als allgemeine Richtlinie. Sie sollten die neuesten Verfahren und Details immer auf der offiziellen Plattform oder Dokumentation des Brokers überprüfen.',
+      readOnlyWarning: 'Stellen Sie zu Ihrer Sicherheit sicher, dass das API-Schlüsselpaar NUR über die Leseberechtigung (Read) verfügt. Aktivieren Sie KEIN Trading, keine Auszahlungen (withdrawals) oder Schreibzugriffe.',
+      close: 'Schließen',
+      binance: {
+        intro: 'So erstellen Sie einen schreibgeschützten API-Schlüssel auf Binance:',
+        step1: 'Melden Sie sich bei Ihrem Binance-Konto an.',
+        step2: 'Gehen Sie zu Ihrem Profilsymbol (oben rechts) und wählen Sie \'API-Verwaltung\'.',
+        step3: 'Klicken Sie auf \'API erstellen\' und wählen Sie \'Vom System generiert\'.',
+        step4: 'Stellen Sie unter API-Einschränkungen sicher, dass NUR \'Lesen aktivieren\' aktiviert ist.',
+        step5: 'Kopieren Sie den API-Schlüssel und den geheimen Schlüssel und fügen Sie sie in dieses Formular ein.'
+      },
+      kraken: {
+        intro: 'So erstellen Sie einen schreibgeschützten API-Schlüssel auf Kraken:',
+        step1: 'Melden Sie sich bei Ihrem Kraken-Konto an.',
+        step2: 'Klicken Sie oben rechts auf Ihren Profilnamen und wählen Sie \'API\'.',
+        step3: 'Klicken Sie auf \'API-Schlüssel hinzufügen\'.',
+        step4: 'Wählen Sie unter \'Schlüsselberechtigungen\' NUR Abfrage-/Leseberechtigungen aus (z. B. \'Guthaben abfragen\', \'Geschlossene Aufträge und Trades abfragen\', \'Hauptbucheinträge abfragen\'). Wählen Sie KEINE Einzahlungs-, Auszahlungs- oder Trading-Berechtigungen aus.',
+        step5: 'Klicken Sie auf \'Schlüssel generieren\' und kopieren Sie dann den API-Schlüssel und den privaten Schlüssel in dieses Formular.'
+      }
+    },
+    botHelp: {
+      title: 'Binance-Bot-CSV-Verlauf Hilfe',
+      whenNeededTitle: 'Wann werden diese Dateien benötigt?',
+      whenNeededText: 'Wenn Sie während des Steuerjahres Spot-Grid- oder Futures-Grid-Trading-Bots auf Binance verwendet haben, müssen die von diesen Bots ausgeführten Transaktionen manuell hochgeladen werden. Der Standard-Binance-API-Schlüssel stellt keine Bot-Transaktionen bereit, daher sind diese CSV-Dateien erforderlich, um Ihre Kapitalerträge genau zu berechnen.',
+      howToGetTitle: 'So erhalten Sie Bot-CSV-Dateien von Binance:',
+      step1: 'Melden Sie sich im Webbrowser bei Ihrem Binance-Konto an.',
+      step2: 'Navigieren Sie zu Traden -> Trading-Bots (oder Grid-Trading).',
+      step3: 'Gehen Sie unter Bot-Trading auf "Verlauf" oder "Auftragsverlauf".',
+      step4: 'Wählen Sie den relevanten Grid-Trading-Verlauf aus und klicken Sie auf "Exportieren". Wählen Sie den Datumsbereich des Steuerjahres.',
+      step5: 'Laden Sie die generierten CSV-Dateien herunter und laden Sie sie hier hoch.',
+      exportLimitNote: 'Hinweis: Wenn das Steuerjahr das Exportlimit von Binance überschreitet (z. B. 6 Monate pro Datei), können Sie mehrere Dateien für verschiedene Zeiträume exportieren und alle hier hochladen.',
+      disclaimerText: 'Diese Anweisungen dienen nur als allgemeine Richtlinie. Sie sollten die neuesten Exportverfahren immer direkt auf der offiziellen Binance-Plattform oder in der Support-Dokumentation überprüfen.'
+    },
+  },
+  tips: {
+    buyMeADrink: 'Spendier mir einen Drink',
+    copyUri: 'URI kopieren',
+    copyAddress: 'Adresse kopieren',
+    copied: 'In die Zwischenablage kopiert',
+    network: 'Netzwerk',
+    chainId: 'Ketten-ID',
+    token: 'Token',
   },
 };

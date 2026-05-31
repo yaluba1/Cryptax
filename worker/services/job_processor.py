@@ -38,6 +38,7 @@ def process_job(job_payload: dict):
     db = get_db_session()
     
     try:
+        attachments = []
         # 1. Fetch full job data from DB
         job = job_service.get_job_by_id(db, job_id)
         if not job:
@@ -85,6 +86,101 @@ def process_job(job_payload: dict):
                     country_code=job.country,
                     job_dir=job_dir
                 )
+                
+                # Check for and merge Binance Bot activity CSVs
+                bot_csv_dir = job_dir / "bot_activity"
+                if bot_csv_dir.exists() and bot_csv_dir.is_dir():
+                    bot_csv_files = list(bot_csv_dir.glob("*.csv"))
+                    if bot_csv_files:
+                        job_service.add_job_event(db, job_id, "bot_activity_processing_started", f"Processing {len(bot_csv_files)} uploaded Binance bot CSV file(s)")
+                        from worker.services.bot_parser_service import parse_bot_csv_to_dali_transactions
+                        from tools.binanceBotActivity.binance_bot_activity.__main__ import main as run_bot_activity_cli
+                        
+                        bot_transactions = []
+                        dfs = []
+                        email_username = job.account_holder.split('@')[0].replace('.', '_')
+                        import pandas as pd
+                        
+                        for csv_file in bot_csv_files:
+                            try:
+                                logger.info("Loading bot activity CSV: {}", csv_file.name)
+                                dfs.append(pd.read_excel(csv_file) if csv_file.suffix == '.xlsx' else pd.read_csv(csv_file))
+                            except Exception as be:
+                                logger.error("Failed to load bot activity CSV {}: {}", csv_file.name, str(be))
+                                job_service.add_job_event(db, job_id, "bot_activity_processing_failed", f"Failed to load bot CSV {csv_file.name}: {str(be)}")
+                                
+                        if dfs:
+                            try:
+                                # Concatenate and sort/deduplicate chronologically
+                                logger.info("Consolidating {} bot CSV dataframes for continuous P&L matching...", len(dfs))
+                                merged_df = pd.concat(dfs, ignore_index=True)
+                                
+                                # Remove duplicates across different file overlaps!
+                                if "OrderNo" in merged_df.columns:
+                                    merged_df = merged_df.drop_duplicates(subset=["OrderNo"], keep="first")
+                                    
+                                merged_df["parsed_time"] = pd.to_datetime(merged_df["Time"])
+                                merged_df = merged_df.sort_values(by=["parsed_time", "OrderNo"], ascending=[True, True])
+                                merged_df = merged_df.drop(columns=["parsed_time"])
+                                
+                                merged_csv_path = job_dir / "merged_bot_activity.csv"
+                                merged_df.to_csv(merged_csv_path, index=False)
+                                
+                                # Parse transactions ONCE from the fully merged & deduplicated CSV!
+                                logger.info("Generating unified DaLI transactions from consolidated bot CSV...")
+                                bot_transactions = parse_bot_csv_to_dali_transactions(merged_csv_path, job.account_holder)
+                                
+                                # Run premium per-bot calculator on consolidated CSV
+                                output_ods_name = f"{job.exchange}_{job.tax_year}_{email_username}_bot_report_out.ods"
+                                output_ods_path = job_dir / output_ods_name
+                                
+                                logger.info("Running premium per-bot calculator on consolidated CSV: {}", output_ods_name)
+                                run_bot_activity_cli([
+                                    "--input", str(merged_csv_path),
+                                    "--method", "FIFO",
+                                    "--output", str(output_ods_path),
+                                    "--local-currency", fiat,
+                                    "--language", getattr(job, "lang", "EN"),
+                                    "--country", getattr(job, "country", "ES")
+                                ])
+                                
+                                # Register bot report in database
+                                if output_ods_path.exists():
+                                    doc_id = job_service.register_document(
+                                        db=db,
+                                        job_id=job_id,
+                                        doc_type="binance_bot_report",
+                                        storage_path=str(output_ods_path),
+                                        filename=output_ods_name,
+                                        mime_type="application/vnd.oasis.opendocument.spreadsheet",
+                                        size=output_ods_path.stat().st_size
+                                    )
+                                    attachments.append(output_ods_path)
+                                    logger.info("Bot ODS report registered: {}", output_ods_name)
+                                    
+                            except Exception as c_err:
+                                logger.error("Failed to run consolidated bot activity P&L: {}", str(c_err))
+                                job_service.add_job_event(db, job_id, "bot_activity_processing_failed", f"Failed to run consolidated bot P&L: {str(c_err)}")
+                                
+                        if bot_transactions:
+                            transactions.extend(bot_transactions)
+                            job_service.add_job_event(
+                                db,
+                                job_id,
+                                "bot_activity_processing_completed",
+                                f"Successfully merged {len(bot_transactions)} bot transactions into consolidated report"
+                            )
+            
+            # Safeguard: Remove any duplicate transactions (by unique_id) before pricing and DaLI
+            seen_ids = set()
+            unique_transactions = []
+            for tx in transactions:
+                if tx.unique_id not in seen_ids:
+                    seen_ids.add(tx.unique_id)
+                    unique_transactions.append(tx)
+                else:
+                    logger.warning("Duplicate transaction unique_id detected and skipped: {}", tx.unique_id)
+            transactions = unique_transactions
             
             # b. Enrich with prices via CCXT
             job_service.add_job_event(db, job_id, "price_enrichment", f"Enriching {len(transactions)} transactions with historical prices from {job.exchange}")
@@ -138,7 +234,6 @@ def process_job(job_payload: dict):
         import zipfile
         import shutil
         
-        attachments = []
         result_metadata = {"documents": []}
         
         # Calculate Prefix: [Exchange]_[tax_year]_[email_username]_
@@ -162,6 +257,19 @@ def process_job(job_payload: dict):
                 shutil.move(str(old_path), str(new_path))
                 renamed_ods_paths[old_name] = new_path
                 
+                # Automatically enrich open positions report with year-end prices
+                if old_name == "fifo_open_positions.ods":
+                    try:
+                        from worker.services.price_enricher import price_enricher
+                        price_enricher.enrich_open_positions_report(
+                            ods_path=new_path,
+                            fiat=fiat,
+                            tax_year=job.tax_year,
+                            exchange_name=job.exchange
+                        )
+                    except Exception as pe_err:
+                        logger.error("Failed to automatically enrich open positions: {}", pe_err)
+                
                 # Register renamed ODS
                 size = new_path.stat().st_size
                 doc_id = job_service.register_document(
@@ -177,40 +285,7 @@ def process_job(job_payload: dict):
             else:
                 logger.warning("Expected report file not found: {}", old_path)
 
-        # 2. Convert to XLSX
-        excel_paths = []
-        for old_name, ods_path in renamed_ods_paths.items():
-            xlsx_name = ods_path.name.replace(".ods", ".xlsx")
-            xlsx_path = job_dir / xlsx_name
-            
-            try:
-                logger.info("Converting {} to XLSX...", ods_path.name)
-                # Load ODS and save as XLSX
-                # sheet_name=None loads all sheets as a dictionary
-                df_map = pd.read_excel(str(ods_path), engine="odf", sheet_name=None)
-                with pd.ExcelWriter(str(xlsx_path), engine="openpyxl") as writer:
-                    for sheet_name, df in df_map.items():
-                        df.to_excel(writer, sheet_name=sheet_name, index=False)
-                
-                excel_paths.append(xlsx_path)
-                
-                # Register XLSX
-                doc_type = "xlsx_" + ods_files_map[old_name].split("_", 1)[1]
-                size = xlsx_path.stat().st_size
-                doc_id = job_service.register_document(
-                    db=db,
-                    job_id=job_id,
-                    doc_type=doc_type,
-                    storage_path=str(xlsx_path),
-                    filename=xlsx_name,
-                    mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    size=size
-                )
-                result_metadata["documents"].append({"id": doc_id, "type": doc_type, "filename": xlsx_name})
-            except Exception as e:
-                logger.error("Failed to convert {} to XLSX: {}", ods_path.name, str(e))
-
-        # 3. Create ZIP: [Exchange]_[tax_year]_[email_username].zip
+        # 2. Create ZIP: [Exchange]_[tax_year]_[email_username].zip
         zip_name = f"{job.exchange}_{job.tax_year}_{email_username}.zip"
         zip_path = job_dir / zip_name
         logger.info("Creating ZIP archive: {}", zip_name)
@@ -218,9 +293,10 @@ def process_job(job_payload: dict):
             # Add renamed ODS
             for p in renamed_ods_paths.values():
                 zipf.write(str(p), p.name)
-            # Add XLSX
-            for p in excel_paths:
-                zipf.write(str(p), p.name)
+            # Add bot reports (if any, keeping standard attachments)
+            for p in attachments:
+                if p.exists() and p != zip_path and p.suffix == ".ods":
+                    zipf.write(str(p), p.name)
                 
         # Register ZIP
         if zip_path.exists():

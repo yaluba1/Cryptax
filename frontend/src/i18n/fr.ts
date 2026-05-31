@@ -6,6 +6,7 @@ export default {
     generate: 'Générer le rapport fiscal',
     loading: 'Chargement...',
     copyright: '© {year} Yaluba. Tous droits réservés.',
+    cancel: 'Annuler',
   },
   auth: {
     loginSuccess: 'Connexion réussie',
@@ -45,6 +46,13 @@ export default {
     title: 'Demander un nouveau rapport fiscal',
     accountHolder: 'E-mail du titulaire du compte',
     country: 'Pays de résidence fiscale',
+    countries: {
+      IE: 'Irlande (IE)',
+      JP: 'Japon (JP)',
+      ES: 'Espagne (ES)',
+      US: 'États-Unis (US)',
+      GENERIC: 'Générique',
+    },
     year: 'Année fiscale',
     exchange: 'Exchange',
     apiKey: 'Clé API',
@@ -60,5 +68,51 @@ export default {
       duplicateJob: 'Un rapport fiscal pour le même pays, la même année fiscale, le même exchange et le même fiat a déjà été demandé et est en état {status}.',
     },
     success: 'Rapport fiscal demandé avec succès',
+    apiHelp: {
+      title: 'Comment obtenir les clés API de {exchange}',
+      important: 'Avertissement de Sécurité Important',
+      disclaimerTitle: 'Clause de Non-responsabilité / À Titre Indicatif',
+      disclaimerText: 'Ces instructions sont fournies uniquement à titre indicatif. Vous devez toujours vérifier les dernières procédures et détails sur la plateforme ou la documentation officielle du courtier.',
+      readOnlyWarning: 'Pour votre sécurité, assurez-vous que la paire de clés API possède UNIQUEMENT les droits de Lecture (Read). N\'activez PAS les options de trading, de retrait (withdrawals) ou d\'accès en écriture.',
+      close: 'Fermer',
+      binance: {
+        intro: 'Pour créer une clé API en lecture seule sur Binance :',
+        step1: 'Connectez-vous à votre compte Binance.',
+        step2: 'Cliquez sur votre icône de Profil (en haut à droite) et sélectionnez \'Gestion des API\'.',
+        step3: 'Cliquez sur \'Créer une API\' et choisissez \'Générée par le système\'.',
+        step4: 'Sous Restrictions d\'API, assurez-vous que seule la case \'Activer la lecture\' est cochée.',
+        step5: 'Copiez la Clé API et la Clé Secrète et collez-les dans ce formulaire.'
+      },
+      kraken: {
+        intro: 'Pour créer une clé API en lecture seule sur Kraken :',
+        step1: 'Connectez-vous à votre compte Kraken.',
+        step2: 'Cliquez sur le nom de votre Profil en haut à droite et sélectionnez \'API\'.',
+        step3: 'Cliquez sur \'Ajouter une clé API\'.',
+        step4: 'Sous \'Autorisations de la clé\', sélectionnez UNIQUEMENT les autorisations de consultation/lecture (par exemple, \'Consulter les fonds\', \'Consulter les ordres clos & transactions\', \'Consulter les écritures de grand livre\'). N\'activez aucune autorisation de dépôt, de retrait ou de trading.',
+        step5: 'Cliquez sur \'Générer la clé\', puis copiez la Clé API et la Clé Privée dans ce formulaire.'
+      }
+    },
+    botHelp: {
+      title: 'Aide sur l\'historique CSV des bots Binance',
+      whenNeededTitle: 'Quand ces fichiers sont-ils nécessaires ?',
+      whenNeededText: 'Si vous avez utilisé des bots de trading Spot Grid ou Futures Grid sur Binance au cours de l\'année fiscale, les transactions exécutées par ces bots doivent être téléchargées manuellement. La clé API standard de Binance n\'expose pas les transactions des bots, ces fichiers CSV sont donc nécessaires pour calculer avec précision vos gains en capital.',
+      howToGetTitle: 'Comment obtenir les fichiers CSV des bots depuis Binance :',
+      step1: 'Connectez-vous à votre compte Binance sur un navigateur Web.',
+      step2: 'Accédez à Trader -> Bots de trading (ou Grid Trading).',
+      step3: 'Allez dans "Historique" ou "Historique des ordres" sous Bots de trading.',
+      step4: 'Sélectionnez l\'historique de grid trading concerné et cliquez sur "Exporter". Choisissez la plage de dates de l\'année fiscale.',
+      step5: 'Téléchargez le ou les fichiers CSV générés et importez-les ici.',
+      exportLimitNote: 'Remarque : Si l\'année fiscale dépasse la limite d\'exportation de Binance (par exemple, 6 mois par fichier), vous pouvez exporter plusieurs fichiers pour différentes sous-périodes et les importer tous ici.',
+      disclaimerText: 'Ces instructions sont fournies à titre indicatif. Vous devez toujours vérifier les dernières procédures d\'exportation directement sur la plateforme officielle ou la documentation d\'assistance de Binance.'
+    },
+  },
+  tips: {
+    buyMeADrink: 'Offrez-moi un verre',
+    copyUri: 'Copier l\'URI',
+    copyAddress: 'Copier l\'adresse',
+    copied: 'Copié dans le presse-papier',
+    network: 'Réseau',
+    chainId: 'ID de chaîne',
+    token: 'Jeton',
   },
 };

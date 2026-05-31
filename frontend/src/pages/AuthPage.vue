@@ -101,4 +101,7 @@ onMounted(async () => {
   max-width: 450px;
   background: white;
 }
+.body--dark .auth-container {
+  background: #1d1d1d;
+}
 </style>

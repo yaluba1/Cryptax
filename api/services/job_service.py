@@ -50,20 +50,92 @@ class JobService:
         
         # 4. Create Internal Job Object and Queue in RQ
         # We do this AFTER database commit. If Redis fails, the job is at least in the DB.
-        internal_job = InternalJob(
-            job_id=job_id,
-            api_key=job_request.api_key,
-            api_secret=job_request.api_secret
-        )
-        
-        try:
-            rq_service.enqueue_job(internal_job)
-        except Exception as e:
-            logger.error(f"Failed to enqueue job {job_id} in Redis: {str(e)}")
-            # Raise here to trigger the global 503 exception handler
-            raise e
+        if not getattr(job_request, "has_bot_activity", False):
+            internal_job = InternalJob(
+                job_id=job_id,
+                api_key=job_request.api_key,
+                api_secret=job_request.api_secret
+            )
+            
+            try:
+                rq_service.enqueue_job(internal_job)
+            except Exception as e:
+                logger.error(f"Failed to enqueue job {job_id} in Redis: {str(e)}")
+                # Raise here to trigger the global 503 exception handler
+                raise e
         
         return job_id
+
+    def save_bot_activity_file(
+        self,
+        db: Session,
+        job_id: str,
+        filename: str,
+        content: bytes,
+        mime_type: str,
+        size: int,
+        uid: str
+    ) -> str:
+        """Saves a bot CSV file and registers it in the documents table."""
+        # 1. Fetch job to verify ownership
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            raise ValueError("Job not found")
+        if job.uid != uid:
+            raise PermissionError("Access denied")
+            
+        # 2. Create job directory & save file
+        job_dir = settings.jobs_data_dir / job_id / "bot_activity"
+        job_dir.mkdir(parents=True, exist_ok=True)
+        file_path = job_dir / filename
+        with open(file_path, "wb") as f:
+            f.write(content)
+            
+        # 3. Register document in DB
+        doc_id = str(uuid.uuid4())
+        new_doc = Document(
+            id=doc_id,
+            job_id=job_id,
+            document_type="binance_bot_csv",
+            storage_path=str(file_path),
+            original_filename=filename,
+            mime_type=mime_type,
+            size_bytes=size,
+            created_at=datetime.now()
+        )
+        db.add(new_doc)
+        
+        # 4. Log event
+        event = JobEvent(
+            job_id=job_id,
+            event_type="bot_csv_uploaded",
+            message=f"Bot CSV file uploaded: {filename}",
+            event_payload_json={"filename": filename, "size_bytes": size}
+        )
+        db.add(event)
+        db.commit()
+        logger.info(f"Bot CSV {filename} saved and registered for job {job_id}.")
+        return doc_id
+
+    def enqueue_delayed_job(self, db: Session, job_id: str, api_key: str, api_secret: str, uid: str):
+        """Enqueues a previously delayed job to Redis RQ."""
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            raise ValueError("Job not found")
+        if job.uid != uid:
+            raise PermissionError("Access denied")
+
+        internal_job = InternalJob(
+            job_id=job_id,
+            api_key=api_key,
+            api_secret=api_secret
+        )
+        try:
+            rq_service.enqueue_job(internal_job)
+            logger.info(f"Delayed job {job_id} successfully enqueued to Redis.")
+        except Exception as e:
+            logger.error(f"Failed to enqueue job {job_id} in Redis: {str(e)}")
+            raise e
 
     def get_jobs_for_account(self, db: Session, account_holder: str, uid: str) -> list[JobListItem]:
         """Retrieve all jobs for an account holder and UID."""

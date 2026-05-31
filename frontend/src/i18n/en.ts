@@ -6,6 +6,7 @@ export default {
     generate: 'Generate Tax Report',
     loading: 'Loading...',
     copyright: '© {year} Yaluba. All rights reserved.',
+    cancel: 'Cancel',
   },
   auth: {
     loginSuccess: 'Login successful',
@@ -45,6 +46,13 @@ export default {
     title: 'Request New Tax Report',
     accountHolder: 'Account Holder Email',
     country: 'Country of Tax Residence',
+    countries: {
+      IE: 'Ireland (IE)',
+      JP: 'Japan (JP)',
+      ES: 'Spain (ES)',
+      US: 'United States (US)',
+      GENERIC: 'Generic',
+    },
     year: 'Tax Year',
     exchange: 'Exchange',
     apiKey: 'API Key',
@@ -60,5 +68,51 @@ export default {
       duplicateJob: 'A tax report for the same country, tax year, exchange and fiat has already been requested and is in state {status}.',
     },
     success: 'Tax report requested successfully',
+    apiHelp: {
+      title: 'How to get {exchange} API Keys',
+      important: 'Important Security Warning',
+      disclaimerTitle: 'Disclaimer / Guidance Only',
+      disclaimerText: 'These instructions are provided as general guidance only. You should always verify the latest procedures and details on the broker\'s official platform or documentation.',
+      readOnlyWarning: 'For your security, make sure the API key pair ONLY has Read permission enabled. Do NOT enable trading, withdrawals, or write access.',
+      close: 'Close',
+      binance: {
+        intro: 'To create a read-only API key on Binance:',
+        step1: 'Log in to your Binance account.',
+        step2: 'Go to your Profile icon (top right) and select \'API Management\'.',
+        step3: 'Click \'Create API\' and choose \'System Generated\'.',
+        step4: 'Under API Restrictions, ensure only \'Enable Reading\' is checked.',
+        step5: 'Copy the API Key and Secret Key and paste them in this form.'
+      },
+      kraken: {
+        intro: 'To create a read-only API key on Kraken:',
+        step1: 'Log in to your Kraken account.',
+        step2: 'Click on your Profile name in the top-right corner and select \'API\'.',
+        step3: 'Click \'Add API key\'.',
+        step4: 'Under \'Key Permissions\', select ONLY query/read permissions (e.g., \'Query funds\', \'Query closed orders & trades\', \'Query ledger entries\'). Do NOT select any deposit, withdrawal, or trading permissions.',
+        step5: 'Click \'Generate key\', then copy the API Key and Private Key to this form.'
+      }
+    },
+    botHelp: {
+      title: 'Binance Bot CSV History Help',
+      whenNeededTitle: 'When are these files needed?',
+      whenNeededText: 'If you used Binance Spot Grid or Futures Grid Trading Bots during the tax year, transactions executed by those bots must be uploaded manually. The standard Binance API key does not expose bot transactions, so these CSV files are required to accurately calculate your capital gains.',
+      howToGetTitle: 'How to get bot CSV files from Binance:',
+      step1: 'Log in to your Binance account on a web browser.',
+      step2: 'Navigate to Trade -> Trading Bots (or Grid Trading).',
+      step3: 'Go to "History" or "Order History" under Bot Trading.',
+      step4: 'Select the relevant grid trading history and click "Export". Choose the tax year date range.',
+      step5: 'Download the generated CSV file(s) and upload them here.',
+      exportLimitNote: 'Note: If the tax year exceeds Binance\'s export limit (e.g., 6 months per file), you can export multiple files for different sub-periods and upload all of them here.',
+      disclaimerText: 'These instructions are provided as general guidance. You should always verify the latest export procedures directly on the official Binance platform or support documentation.'
+    },
+  },
+  tips: {
+    buyMeADrink: 'Buy me a drink',
+    copyUri: 'Copy URI',
+    copyAddress: 'Copy Address',
+    copied: 'Copied to clipboard',
+    network: 'Network',
+    chainId: 'Chain ID',
+    token: 'Token',
   },
 };

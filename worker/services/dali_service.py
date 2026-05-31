@@ -483,6 +483,7 @@ class DaliService:
                     if str(params.get(Keyword.CRYPTO_FEE.value)).lower() == unknown_val:
                         DaliService._update_tx_attribute(tx, Keyword.CRYPTO_FEE.value, "0")
                         tx_modified = True
+                        warnings.append(f"Warning: Transaction {tx.unique_id}: 'crypto_fee' was unknown, defaulted to 0")
                     if str(params.get(Keyword.FIAT_FEE.value)).lower() == unknown_val:
                         DaliService._update_tx_attribute(tx, Keyword.FIAT_FEE.value, "0")
                         tx_modified = True
@@ -491,16 +492,38 @@ class DaliService:
                         tx_modified = True
                 except: pass
             elif isinstance(tx, OutTransaction):
+                is_fee_tx = False
                 try:
-                    if float(tx.crypto_out_no_fee) <= 0:
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, tiny_val)
-                        tx_modified = True
-                    if tx.fiat_out_no_fee is not None and float(tx.fiat_out_no_fee) <= 0:
-                        DaliService._update_tx_attribute(tx, Keyword.FIAT_OUT_NO_FEE.value, tiny_val)
-                        tx_modified = True
+                    if hasattr(tx, "transaction_type"):
+                        tx_type_str = str(tx.transaction_type).lower()
+                        if tx_type_str == "fee" or getattr(tx.transaction_type, "value", None) == "fee":
+                            is_fee_tx = True
+
+                    if is_fee_tx:
+                        if float(tx.crypto_out_no_fee) != 0:
+                            DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, "0")
+                            tx_modified = True
+                        if tx.fiat_out_no_fee is not None:
+                            DaliService._update_tx_attribute(tx, Keyword.FIAT_OUT_NO_FEE.value, None)
+                            tx_modified = True
+                    else:
+                        if float(tx.crypto_out_no_fee) <= 0:
+                            DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, tiny_val)
+                            tx_modified = True
+                        if tx.fiat_out_no_fee is not None and float(tx.fiat_out_no_fee) <= 0:
+                            DaliService._update_tx_attribute(tx, Keyword.FIAT_OUT_NO_FEE.value, tiny_val)
+                            tx_modified = True
+
                     if str(params.get(Keyword.CRYPTO_FEE.value)).lower() == unknown_val:
-                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_FEE.value, "0")
+                        if is_fee_tx:
+                            DaliService._update_tx_attribute(tx, Keyword.CRYPTO_FEE.value, tiny_val)
+                        else:
+                            DaliService._update_tx_attribute(tx, Keyword.CRYPTO_FEE.value, "0")
                         tx_modified = True
+                    elif is_fee_tx and float(tx.crypto_fee) <= 0:
+                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_FEE.value, tiny_val)
+                        tx_modified = True
+
                     if str(params.get(Keyword.FIAT_FEE.value)).lower() == unknown_val:
                         DaliService._update_tx_attribute(tx, Keyword.FIAT_FEE.value, "0")
                         tx_modified = True
@@ -524,7 +547,11 @@ class DaliService:
                                 tx_modified = True
                     except: pass
                 except:
-                    DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, tiny_val)
+                    if is_fee_tx:
+                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, "0")
+                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_FEE.value, tiny_val)
+                    else:
+                        DaliService._update_tx_attribute(tx, Keyword.CRYPTO_OUT_NO_FEE.value, tiny_val)
                     tx_modified = True
             elif isinstance(tx, IntraTransaction):
                 try:
@@ -540,6 +567,8 @@ class DaliService:
                         recv = sent
                         DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, str(recv))
                         tx_modified = True
+                        if recv_str.lower() == unknown_val:
+                            warnings.append(f"Warning: Transaction {tx.unique_id}: 'crypto_received' was unknown, defaulted to {recv}")
                     if sent < recv:
                         DaliService._update_tx_attribute(tx, Keyword.CRYPTO_RECEIVED.value, str(sent))
                         tx_modified = True
@@ -656,7 +685,14 @@ class DaliService:
     @staticmethod
     def _get_redis_conn():
         import redis
-        return redis.Redis(host=settings.redis_host, port=settings.redis_port, db=settings.redis_db, decode_responses=True)
+        return redis.Redis(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            db=settings.redis_db,
+            decode_responses=True,
+            socket_timeout=2.0,
+            socket_connect_timeout=2.0
+        )
 
     @staticmethod
     def _load_price_cache(): return {}

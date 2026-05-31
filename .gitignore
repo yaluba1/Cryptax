@@ -114,6 +114,7 @@ logs/
 log/
 data/
 tmp_*/
+out/
 
 cryptax-data/
 redis-only.yaml

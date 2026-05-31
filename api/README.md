@@ -20,7 +20,8 @@ The CrypTax API is a FastAPI-based service responsible for managing cryptocurren
 ## Core Endpoints
 
 - **Health Check**: `GET /api/v1/health` - System status.
-- **Job Creation**: `POST /api/v1/jobs` - Create a new tax processing job (JWT required).
+- **Job Creation**: `POST /api/v1/jobs` - Create a new tax processing job. If `has_bot_activity` is `true`, the job is gated (created in `pending` state but not enqueued immediately in RQ). JWT required.
+- **Bot CSV Upload**: `POST /api/v1/jobs/{job_id}/bot-activity` - Upload Binance bot CSV files. After successfully saving the files, the job is enqueued in the Redis queue for unified processing. Form-data with `files`, `api_key`, and `api_secret` is required. JWT required.
 - **Job Listing**: `GET /api/v1/jobs` - List jobs for an account (JWT required).
 - **Job Deletion**: `DELETE /api/v1/jobs/{job_id}` - Remove a job and its data (JWT required).
 - **Document Download**: `GET /api/v1/documents/{id}/download` - Download reports (JWT required).

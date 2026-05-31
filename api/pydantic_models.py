@@ -51,6 +51,7 @@ class JobRequestBody(BaseModel):
     api_key: str = Field(..., description="Exchange API Key.")
     api_secret: str = Field(..., description="Exchange API Secret.")
     fiat: str = Field(..., description="Native fiat currency for this account holder.")
+    has_bot_activity: Optional[bool] = Field(False, description="Flag indicating if the job has Binance bot activity and requires uploading bot CSV files.")
 
     @field_validator('year')
     @classmethod
