@@ -118,3 +118,7 @@ out/
 
 cryptax-data/
 redis-only.yaml
+
+scratch/
+generate_qr.py
+generate_solana_qr.py

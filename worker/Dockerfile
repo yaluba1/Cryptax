@@ -26,6 +26,7 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
 
 # Copy the worker package
 COPY worker/ /app/worker/
+COPY tools/ /app/tools/
 
 # Ensure data directory exists and set permissions
 RUN mkdir -p /app/data && \
@@ -34,4 +35,4 @@ RUN mkdir -p /app/data && \
 USER workeruser
 
 # Run the worker as a module
-CMD ["python", "-m", "worker.main"]
+CMD ["python", "-m", "worker.main"]
